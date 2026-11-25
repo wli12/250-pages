@@ -37,7 +37,16 @@
   color-scheme: dark;
 }
 body { --acc: var(--db); --on-acc: var(--on-db); --tint: var(--db-tint); --deep: var(--db-deep); }
-body[data-list="im"] { --acc: var(--im); --on-acc: var(--on-im); --tint: var(--im-tint); --deep: var(--im-deep); }
+body[data-tone="im"] { --acc: var(--im); --on-acc: var(--on-im); --tint: var(--im-tint); --deep: var(--im-deep); }
+/* the other lists take one hue each; tint and deep text are mixed from it so both themes follow */
+body[data-tone="genre"] { --tone: #1f8f8a; }
+body[data-tone="award"] { --tone: #b98218; }
+body[data-tone="box"] { --tone: #c4503f; }
+body[data-tone="book"] { --tone: #6f8440; }
+body[data-tone="genre"], body[data-tone="award"], body[data-tone="box"], body[data-tone="book"] {
+  --acc: var(--tone); --on-acc: #ffffff;
+  --tint: color-mix(in srgb, var(--tone) 20%, var(--surface)); --deep: color-mix(in srgb, var(--tone) 45%, var(--ink));
+}
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--text); }
@@ -74,6 +83,27 @@ a { color: inherit; }
 .pct { font-family: var(--num); font-weight: 700; font-size: 40px; line-height: .9; font-variant-numeric: tabular-nums; }
 .bar { height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--surface) 60%, transparent); overflow: hidden; margin-top: 8px; }
 .bar i { display: block; height: 100%; background: var(--acc); border-radius: 4px; transition: width .25s; }
+
+/* home */
+.home-top { background: var(--surface); border-bottom: 1px solid var(--line); }
+.home-top .inner { padding-block: 14px 18px; display: flex; flex-direction: column; gap: 14px; }
+.home-top h1 { margin: 0; font-size: 26px; letter-spacing: .02em; }
+.home-top .lede { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.home-top .lists { background: var(--soft); }
+.home-top .lists button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.home-top .gear { background: var(--soft); }
+.group h2 { margin: 6px 2px 8px; font-size: 13px; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.cards { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.lcard { border: 0; background: var(--surface); border-radius: 16px; padding: 12px; text-align: left; display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 4px 12px; align-items: center; }
+.lcard .ico { grid-row: span 3; width: 52px; height: 52px; border-radius: 13px; display: grid; place-items: center; font: 700 22px/1 var(--text); background: var(--c); color: var(--oc, #fff); }
+.lcard .ico.t-db { --c: var(--db); --oc: var(--on-db); } .lcard .ico.t-im { --c: var(--im); --oc: var(--on-im); font-family: var(--num); }
+.lcard .ico.t-genre { --c: #1f8f8a; } .lcard .ico.t-award { --c: #b98218; } .lcard .ico.t-box { --c: #c4503f; } .lcard .ico.t-book { --c: #6f8440; }
+.lcard .lname { font-weight: 700; font-size: 16px; line-height: 1.3; overflow-wrap: anywhere; }
+.lcard .lmeta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lcard .bar { margin: 2px 0 0; height: 5px; background: var(--soft); }
+.lcard .bar i { background: var(--c2, var(--ink)); opacity: .75; }
+.back { border: 0; background: color-mix(in srgb, var(--surface) 55%, transparent); color: inherit; border-radius: 999px; padding: 6px 14px 6px 10px; white-space: nowrap; }
+.note { background: var(--tint); color: var(--deep); border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 
 /* controls */
 .controls { background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
@@ -187,26 +217,42 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
 </head>
 <body>
 <!--body-->
-<header class="hero">
-  <div class="hero-ghost" aria-hidden="true">250</div>
-  <div class="inner">
-    <div class="bar-top">
-      <div class="lists" role="group" aria-label="榜单">
-        <button type="button" data-list="db" aria-pressed="true">豆瓣</button>
-        <button type="button" data-list="im" aria-pressed="false">IMDb</button>
+<div id="home" hidden>
+  <header class="home-top">
+    <div class="inner">
+      <div class="bar-top">
+        <div class="lists" role="group" aria-label="分区" id="sections">
+          <button type="button" data-section="movie" aria-pressed="true">电影</button>
+          <button type="button" data-section="book" aria-pressed="false">读书</button>
+        </div>
+        <div class="tools">
+          <button type="button" class="gear" id="open-account" hidden>登录</button>
+          <button type="button" class="gear" id="open-settings">播放源与备份</button>
+        </div>
       </div>
-      <div class="tools">
-        <button type="button" class="gear" id="open-account" hidden>登录</button>
-        <button type="button" class="gear" id="open-settings">播放源与备份</button>
+      <div>
+        <h1>片单标记</h1>
+        <p class="lede" id="home-sum">正在载入榜单…</p>
       </div>
     </div>
+  </header>
+  <main class="inner" id="home-body"></main>
+</div>
+
+<div id="listview" hidden>
+<header class="hero">
+  <div class="hero-ghost" aria-hidden="true" id="ghost">250</div>
+  <div class="inner">
+    <div class="bar-top">
+      <button type="button" class="back" id="back">‹ 全部榜单</button>
+    </div>
     <div>
-      <h1 id="list-title">豆瓣电影 Top 250</h1>
-      <p class="lede">标记看过的经典，顺手记下在哪儿能看</p>
+      <h1 id="list-title"></h1>
+      <p class="lede" id="list-lede"></p>
     </div>
     <div aria-live="polite">
       <div class="prog-head">
-        <span class="lab">已看 <b id="n-seen">0</b> / <span id="n-all">250</span></span>
+        <span class="lab"><span id="seen-word">已看</span> <b id="n-seen">0</b> / <span id="n-all">250</span></span>
         <span class="pct" id="pct">0%</span>
       </div>
       <div class="bar"><i id="bar" style="width:0"></i></div>
@@ -224,17 +270,18 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     </div>
     <div class="finder">
       <select id="src-filter" aria-label="按播放源筛选"></select>
-      <input id="q" type="search" placeholder="搜片名、导演、演员、类型" aria-label="搜索片单">
+      <input id="q" type="search" placeholder="搜片名、导演、演员、类型" aria-label="搜索">
     </div>
   </div>
 </section>
 
 <main class="inner">
   <ul class="wall" id="wall"></ul>
-  <p class="empty" id="empty" hidden>没有符合条件的影片。</p>
-  <p class="foot" id="note">正在载入片单…</p>
+  <p class="empty" id="empty" hidden>没有符合条件的条目。</p>
+  <p class="foot" id="note"></p>
   <p class="foot" id="foot"></p>
 </main>
+</div>
 
 <dialog id="detail"><div class="dlg" id="detail-body"></div></dialog>
 
@@ -280,8 +327,9 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   const safeUrl = (u) => (/^https?:\/\//i.test((u || '').trim()) ? u.trim() : '');
 
   // marks: { filmId: 'seen' | 'want' }; avail: { filmId: { sourceId: { a: 1 | 0, u: url } } }
-  let state = { marks: {}, avail: {}, sources: DEFAULT_SOURCES.map((s) => ({ ...s })), srcVer: SRC_VER, list: 'db' };
+  let state = { marks: {}, avail: {}, sources: DEFAULT_SOURCES.map((s) => ({ ...s })), srcVer: SRC_VER, list: '', section: 'movie' };
   let ui = { filter: 'all', src: '', q: '' };
+  let lists = [], listById = new Map(), memberOf = new Map(), loaded = false;
   let films = [], meta = {}, byId = new Map(), openId = null;
 
   function adopt(o) {
@@ -293,7 +341,8 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       state.srcVer = Number(o.srcVer) || 1;
       upgradeSources();
     }
-    if (o.list === 'db' || o.list === 'im') state.list = o.list;
+    if (typeof o.list === 'string') state.list = o.list;
+    if (o.section === 'movie' || o.section === 'book') state.section = o.section;
     return true;
   }
   // Saved source lists from before the platform sources existed gain them once.
@@ -314,7 +363,17 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   function store() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
   function save() { store(); touch(); }
 
-  const inList = (f, l) => (l === 'db' ? f.db : f.imdb);
+  const cur = () => listById.get(state.list);
+  const isBook = () => { const l = cur(); return !!(l && l.kind === 'book'); };
+  const GLYPH = { db: '豆', im: 'IMDb', boxoffice: '票', 'db-comedy': '喜', 'db-scifi': '科', 'db-mystery': '悬', 'db-romance': '爱', 'db-anim': '动', 'db-doc': '纪',
+    'oscar-picture': '影', 'oscar-intl': '外', 'oscar-anim': '动', 'oscar-screenplay': '剧', 'oscar-vfx': '效', palme: '棕', 'book-db': '书' };
+  function go(id) {
+    state.list = id; ui.filter = 'all'; ui.q = ''; $('#q').value = '';
+    store();
+    const h = id ? 'l-' + id : '';
+    if (location.hash.slice(1) !== h) location.hash = h; else render();
+    window.scrollTo(0, 0);
+  }
   const srcOf = (f, sid) => (state.avail[f.id] || {})[sid] || {};
   // What we know about a film on a source: the viewer's own notes first, then the play page Douban listed.
   function srcInfo(f, s) {
@@ -339,59 +398,117 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   const searchUrl = (s, f) => safeUrl((s.tpl || '').replace('{q}', encodeURIComponent(f.zh)));
 
   function visible() {
-    const q = ui.q.trim().toLowerCase();
-    return films
-      .filter((f) => inList(f, state.list))
-      .filter((f) => {
-        const m = state.marks[f.id];
-        if (ui.filter === 'seen' && m !== 'seen') return false;
-        if (ui.filter === 'want' && m !== 'want') return false;
-        if (ui.filter === 'todo' && m === 'seen') return false;
-        if (ui.src && !(srcById(ui.src) && srcInfo(f, srcById(ui.src)).has)) return false;
-        if (q && !`${f.zh} ${f.orig} ${f.dir || ''} ${f.cast || ''} ${f.genre || ''} ${f.year}`.toLowerCase().includes(q)) return false;
-        return true;
-      })
-      .sort((a, b) => inList(a, state.list).rank - inList(b, state.list).rank);
+    const l = cur(), q = ui.q.trim().toLowerCase();
+    if (!l) return [];
+    return l.items.map((r) => ({ r, f: byId.get(r.f) })).filter(({ f }) => {
+      if (!f) return false;
+      const m = state.marks[f.id];
+      if (ui.filter === 'seen' && m !== 'seen') return false;
+      if (ui.filter === 'want' && m !== 'want') return false;
+      if (ui.filter === 'todo' && m === 'seen') return false;
+      if (ui.src && !(srcById(ui.src) && srcInfo(f, srcById(ui.src)).has)) return false;
+      if (q && !`${f.zh} ${f.orig || ''} ${f.dir || ''} ${f.cast || ''} ${f.genre || ''} ${f.author || ''} ${f.year}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }
+
+  function progress(l) {
+    let seen = 0, want = 0;
+    for (const r of l.items) { const m = state.marks[r.f]; if (m === 'seen') seen++; else if (m === 'want') want++; }
+    return { seen, want, total: l.items.length };
+  }
+  function renderHome() {
+    document.body.dataset.tone = '';
+    document.querySelectorAll('#sections button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.section === state.section));
+    if (!loaded) return;
+    const book = state.section === 'book';
+    const mine = lists.filter((l) => (l.kind === 'book') === book);
+    const ids = new Set(mine.flatMap((l) => l.items.map((r) => r.f)));
+    let seen = 0, want = 0;
+    for (const id of ids) { const m = state.marks[id]; if (m === 'seen') seen++; else if (m === 'want') want++; }
+    $('#home-sum').textContent = book
+      ? `${mine.length} 个书单 · 共 ${ids.size} 本 · 已读 ${seen} 本 · 想读 ${want} 本`
+      : `${mine.length} 个榜单 · 共 ${ids.size} 部电影 · 已看 ${seen} 部 · 想看 ${want} 部。在一个榜单里标记，其他榜单同步更新。`;
+    const groups = [];
+    for (const l of mine) { let g = groups.find((x) => x.name === l.group); if (!g) groups.push(g = { name: l.group, lists: [] }); g.lists.push(l); }
+    $('#home-body').innerHTML = groups.map((g) => `<section class="group"><h2>${esc(g.name)}</h2><div class="cards">${g.lists.map((l) => {
+      const p = progress(l), w = book ? ['已读', '想读'] : ['已看', '想看'];
+      return `<button type="button" class="lcard" data-go="${esc(l.id)}">
+        <span class="ico t-${esc(l.tone)}" aria-hidden="true">${esc(GLYPH[l.id] || l.name.slice(0, 1))}</span>
+        <span class="lname">${esc(l.name)}</span>
+        <span class="lmeta">${w[0]} ${p.seen} / ${p.total}${p.want ? ` · ${w[1]} ${p.want}` : ''}</span>
+        <span class="bar"><i style="width:${(p.seen / p.total) * 100}%"></i></span>
+      </button>`;
+    }).join('')}</div></section>`).join('');
   }
 
   function render() {
-    document.body.dataset.list = state.list;
-    document.querySelectorAll('.lists button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.list === state.list));
-    $('#list-title').textContent = state.list === 'db' ? '豆瓣电影 Top 250' : 'IMDb 电影 Top 250';
+    const l = cur();
+    $('#home').hidden = !!l; $('#listview').hidden = !l;
+    if (!l) { renderHome(); return; }
+    const book = l.kind === 'book', W = book ? { seen: '已读', want: '想读', todo: '未读' } : { seen: '已看', want: '想看', todo: '未看' };
+    document.body.dataset.tone = l.tone;
+    $('#list-title').textContent = l.name;
+    $('#list-lede').textContent = book ? '标记读过的书和想读的书' : '标记看过的电影，顺手记下在哪儿能看';
+    $('#ghost').textContent = l.items.length;
+    $('#seen-word').textContent = W.seen;
+    $('#back').textContent = book ? '‹ 全部书单' : '‹ 全部榜单';
+    $('#q').placeholder = book ? '搜书名、作者' : '搜片名、导演、演员、类型';
 
     const sel = $('#src-filter');
+    sel.hidden = book;
     sel.innerHTML = '<option value="">播放源不限</option>' +
       state.sources.map((s) => `<option value="${esc(s.id)}">${esc(s.name)}有</option>`).join('');
-    if (!state.sources.some((s) => s.id === ui.src)) ui.src = '';
+    if (book || !state.sources.some((s) => s.id === ui.src)) ui.src = '';
     sel.value = ui.src;
 
-    const all = films.filter((f) => inList(f, state.list));
-    const seen = all.filter((f) => state.marks[f.id] === 'seen').length;
-    const want = all.filter((f) => state.marks[f.id] === 'want').length;
-    const total = all.length || 250;
-    $('#n-seen').textContent = seen;
-    $('#n-all').textContent = total;
-    $('#pct').textContent = Math.round((seen / total) * 100) + '%';
-    $('#bar').style.width = (seen / total) * 100 + '%';
-    const counts = { all: total, seen, want, todo: total - seen };
-    const labels = { all: '全部', seen: '已看', want: '想看', todo: '未看' };
+    const p = progress(l);
+    $('#n-seen').textContent = p.seen;
+    $('#n-all').textContent = p.total;
+    $('#pct').textContent = Math.round((p.seen / p.total) * 100) + '%';
+    $('#bar').style.width = (p.seen / p.total) * 100 + '%';
+    const counts = { all: p.total, seen: p.seen, want: p.want, todo: p.total - p.seen };
+    const labels = { all: '全部', ...W };
     document.querySelectorAll('#status button').forEach((b) => {
       b.setAttribute('aria-pressed', b.dataset.f === ui.filter);
       b.textContent = `${labels[b.dataset.f]}(${counts[b.dataset.f]})`;
     });
-    if (films.length) {
-      const both = films.filter((f) => state.marks[f.id] === 'seen').length;
-      $('#note').textContent = `两个榜单合计 ${films.length} 部，看过 ${both} 部。同时上两个榜的影片只需标记一次。`;
-    }
 
-    const brand = state.list === 'db' ? '豆瓣' : 'IMDb';
     const rows = visible();
-    $('#wall').innerHTML = rows.map((f) => {
-      const r = inList(f, state.list), m = state.marks[f.id];
+    $('#wall').innerHTML = rows.map(({ f, r }) => {
+      const m = state.marks[f.id];
+      const score = r.score != null ? r.score : f.ds, brand = r.score != null ? l.brand : (f.ds != null ? '豆瓣' : '');
+      const rate = score != null ? `<span class="stars" aria-hidden="true"><i style="width:${Math.min(100, score * 10)}%"></i></span>${score}<small>${esc(brand)}${brand === '豆瓣' && f.votes ? ` · ${fmtVotes(f.votes)}人评价` : ''}</small>` : '';
+      const note = r.note ? `<span class="note">${esc(r.note)}</span>` : '';
+      const quote = f.quote ? `<div class="quote">${esc(f.quote)}${/[。！？!?.…]$/.test(f.quote) ? '' : '。'}</div>` : '';
+      const acts = `<span class="acts">
+            <button type="button" class="mk" data-mark="want" aria-pressed="${m === 'want'}">${W.want}</button>
+            <button type="button" class="mk" data-mark="seen" aria-pressed="${m === 'seen'}">${W.seen}</button>
+          </span>`;
+      if (book) {
+        return `<li class="tile${m === 'seen' ? ' is-seen' : ''}" data-id="${esc(f.id)}">
+        <div class="card-top">
+          <div class="poster"><span class="ph">${esc(f.zh)}</span><span class="rk">${r.rank}</span></div>
+          <div class="info">
+            <div class="name">${esc(f.zh)}</div>
+            ${f.orig ? `<div class="orig">${esc(f.orig)}</div>` : ''}
+            <div class="rate">${rate}</div>
+            <div class="meta">${esc([f.author, f.pub, f.year].filter(Boolean).join(' / '))}</div>
+            ${quote}
+          </div>
+        </div>
+        <div class="card-foot">
+          <span class="chips">
+            <a class="chip" href="https://book.douban.com/subject/${esc(f.did)}/" target="_blank" rel="noopener">豆瓣读书 ↗</a>
+            <a class="chip" href="https://weread.qq.com/web/search/global?keyword=${encodeURIComponent(f.zh)}" target="_blank" rel="noopener">微信读书 <small>去搜</small></a>
+          </span>${acts}
+        </div>
+      </li>`;
+      }
       const img = /^posters\/[\w.-]+$/.test(f.img || '') ? f.img : '';
       const meta = [f.year, f.region, f.genre, f.dir, f.cast].filter(Boolean).join(' / ');
-      const o = state.list === 'db' ? f.imdb : f.db;
-      const other = o ? `${state.list === 'db' ? 'IMDb' : '豆瓣'} Top 250 第 ${o.rank} 名（${o.score}）` : '';
+      const others = (memberOf.get(f.id) || []).filter((x) => x.l !== l);
+      const also = others.slice(0, 4).map((x) => `${esc(x.l.name)}${x.l.tone === 'award' ? '' : ` 第 ${x.rank} 名`}`).join('、') + (others.length > 4 ? ` 等 ${others.length} 个榜单` : '');
       const chips = state.sources.map((s) => {
         const i = srcInfo(f, s), su = searchUrl(s, f), name = esc(s.name);
         if (i.mine) return `<a class="chip play" href="${esc(i.mine)}" target="_blank" rel="noopener">▶ ${name}</a>`;
@@ -406,24 +523,21 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
           <div class="info">
             <button type="button" class="name" data-open>${esc(f.zh)}</button>
             ${f.orig && f.orig !== f.zh ? `<div class="orig">${esc(f.orig)}</div>` : ''}
-            <div class="rate"><span class="stars" aria-hidden="true"><i style="width:${Math.min(100, r.score * 10)}%"></i></span>${r.score}<small>${brand}${state.list === 'db' && f.votes ? ` · ${fmtVotes(f.votes)}人评价` : ''}</small></div>
+            ${rate || note ? `<div class="rate">${rate}${note}</div>` : ''}
             <div class="meta">${esc(meta)}</div>
             ${f.aka ? `<div class="meta">又名：${esc(f.aka)}</div>` : ''}
-            ${other ? `<div class="meta">同时位列 ${other}</div>` : ''}
-            ${f.quote ? `<div class="quote">${esc(f.quote)}${/[。！？!?.…]$/.test(f.quote) ? '' : '。'}</div>` : ''}
+            ${also ? `<div class="meta">也在：${also}</div>` : ''}
+            ${quote}
           </div>
         </div>
         <div class="card-foot">
-          <span class="chips">${chips}<button type="button" class="chip edit" data-open>记录播放网址</button></span>
-          <span class="acts">
-            <button type="button" class="mk" data-mark="want" aria-pressed="${m === 'want'}">想看</button>
-            <button type="button" class="mk" data-mark="seen" aria-pressed="${m === 'seen'}">已看</button>
-          </span>
+          <span class="chips">${chips}<button type="button" class="chip edit" data-open>记录播放网址</button></span>${acts}
         </div>
       </li>`;
     }).join('');
-    $('#empty').hidden = rows.length > 0 || !films.length;
-    if (meta.doubanAsOf) $('#foot').textContent = `豆瓣榜单截至 ${meta.doubanAsOf}，IMDb 榜单截至 ${meta.imdbAsOf}。`;
+    $('#empty').hidden = rows.length > 0;
+    $('#note').textContent = book ? '' : '同一部电影在所有榜单里共用一个标记。';
+    $('#foot').textContent = l.asOf ? `榜单数据截至 ${l.asOf}。` : '';
   }
 
   function renderDetail() {
@@ -431,11 +545,10 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     if (!f) return;
     const m = state.marks[f.id];
     const ranks = [];
-    if (f.db) ranks.push(`<a href="https://movie.douban.com/subject/${esc(f.db.id)}/" target="_blank" rel="noopener">豆瓣 <b>#${f.db.rank}</b> · ${f.db.score} ↗</a>`);
-    if (f.imdb) {
-      const u = f.imdb.tt ? `https://www.imdb.com/title/${esc(f.imdb.tt)}/` : `https://www.imdb.com/find/?q=${encodeURIComponent(f.orig || f.zh)}`;
-      ranks.push(`<a href="${u}" target="_blank" rel="noopener">IMDb <b>#${f.imdb.rank}</b> · ${f.imdb.score} ↗</a>`);
-    }
+    if (f.did) ranks.push(`<a href="https://movie.douban.com/subject/${esc(f.did)}/" target="_blank" rel="noopener">豆瓣${f.ds != null ? ` · ${f.ds}` : ''} ↗</a>`);
+    const imdbUrl = f.tt ? `https://www.imdb.com/title/${esc(f.tt)}/` : `https://www.imdb.com/find/?q=${encodeURIComponent(f.orig || f.zh)}`;
+    ranks.push(`<a href="${imdbUrl}" target="_blank" rel="noopener">IMDb${f.imdb ? ` · ${f.imdb.score}` : ''} ↗</a>`);
+    const inLists = (memberOf.get(f.id) || []).map((x) => `${esc(x.l.name)}${x.l.tone === 'award' ? '' : ` #${x.rank}`}`).join(' · ');
     const sub = [f.orig, f.year, f.region, f.genre, f.dir, f.cast].filter(Boolean).join(' / ');
     const srcs = state.sources.map((s) => {
       const i = srcInfo(f, s), v = i.v, direct = i.direct, su = searchUrl(s, f);
@@ -458,6 +571,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       ${f.aka ? `<div class="sub">又名：${esc(f.aka)}</div>` : ''}
       ${f.votes ? `<div class="sub">豆瓣 ${fmtVotes(f.votes)}人评价</div>` : ''}
       <div class="ranks">${ranks.join('')}</div>
+      ${inLists ? `<div class="sub">所在榜单：${inLists}</div>` : ''}
       <div class="marks">
         <button type="button" class="mk" data-mark="want" aria-pressed="${m === 'want'}">想看</button>
         <button type="button" class="mk" data-mark="seen" aria-pressed="${m === 'seen'}">已看</button>
@@ -479,9 +593,20 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   }
 
   // ---- events
-  document.querySelector('.lists').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-list]');
-    if (b) { state.list = b.dataset.list; store(); render(); }
+  $('#sections').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-section]');
+    if (b) { state.section = b.dataset.section; store(); render(); }
+  });
+  $('#home-body').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-go]');
+    if (b) go(b.dataset.go);
+  });
+  $('#back').addEventListener('click', () => go(''));
+  window.addEventListener('hashchange', () => {
+    const id = location.hash.startsWith('#l-') ? location.hash.slice(3) : '';
+    state.list = listById.has(id) ? id : '';
+    if (state.list) state.section = isBook() ? 'book' : 'movie';
+    store(); render();
   });
   $('#status').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-f]');
@@ -754,10 +879,17 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   fetch('data/movies.json')
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((d) => {
-      films = d.films; meta = d; byId = new Map(films.map((f) => [f.id, f]));
+      films = d.films; meta = d; lists = d.lists || [];
+      byId = new Map([...films, ...(d.books || [])].map((f) => [f.id, f]));
+      listById = new Map(lists.map((l) => [l.id, l]));
+      for (const l of lists) for (const r of l.items) { if (!memberOf.has(r.f)) memberOf.set(r.f, []); memberOf.get(r.f).push({ l, rank: r.rank }); }
+      loaded = true;
+      const h = location.hash.startsWith('#l-') ? location.hash.slice(3) : null;
+      if (h !== null) state.list = h;
+      if (!listById.has(state.list)) state.list = '';
       migrate(); store(); render();
     })
-    .catch(() => { $('#note').textContent = '片单没有载入成功，刷新页面再试一次。'; });
+    .catch(() => { $('#home-sum').textContent = '榜单没有载入成功，刷新页面再试一次。'; });
 })();
 </script>
 <!--/body-->
