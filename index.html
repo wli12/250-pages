@@ -712,6 +712,20 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     let o;
     try { o = JSON.parse($('#backup').value); } catch (err) { o = null; }
     if (!o || o.app !== 'pianDan') { msg.textContent = '这不是有效的备份文字。先把备份粘贴到上面的框里。'; return; }
+    if (o.merge) {
+      // an import that only adds: nothing already marked is removed, "seen" wins over "want"
+      let added = 0;
+      const known = new Set(byId.keys());
+      for (const f of films) if (f.alt) known.add(f.alt);
+      for (const [id, v] of Object.entries(o.marks || {})) {
+        if (!known.has(id) || (v !== 'seen' && v !== 'want')) continue;
+        if (state.marks[id] === 'seen' || state.marks[id] === v) continue;
+        state.marks[id] = v; added++;
+      }
+      migrate(); save(); render();
+      msg.textContent = `已合并：新增 ${added} 条，原有标记都保留。现在共 ${Object.keys(state.marks).length} 条`;
+      return;
+    }
     adopt(o); migrate(); save(); renderSettings(); render();
     msg.textContent = `已导入：${Object.keys(state.marks).length} 条标记`;
   });
