@@ -11,3 +11,7 @@
 //   appId: '...',
 // };
 window.PIANDAN_FIREBASE = null;
+
+// 把标记自动保存到一个私有 GitHub 仓库里的文件（给站长自己用的备份方式）。
+// 这里只写仓库位置，不含任何密钥；访问令牌由使用者在页面的“播放源与备份”里填写，只存在他自己的浏览器中。
+window.PIANDAN_GITHUB = { repo: 'wli12/250', branch: 'userdata', path: 'marks.json' };

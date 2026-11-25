@@ -301,6 +301,12 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     <p class="hint">搜索网址里用 <code>{q}</code> 代表片名；网址里没有 <code>{q}</code> 的，点击时会自动复制片名，到站内搜索框粘贴。在对应网站搜一次，把地址栏里的片名换成 <code>{q}</code> 贴进来即可。影片下面只显示能直接打开播放页的来源；搜索网址只在“记录播放网址”里用来帮你找到播放页。</p>
     <div class="srcs" id="cfg-list"></div>
     <div class="row"><button type="button" class="btn" id="add-src">添加播放源</button></div>
+    <div id="gh-box" hidden>
+      <h3>自动保存到 GITHUB</h3>
+      <p class="hint">填入访问令牌后，标记会自动保存到你的私有仓库，换浏览器或清了缓存也能找回。令牌只存在这个浏览器里。</p>
+      <div class="email-form"><input type="password" id="gh-token" placeholder="github_pat_…" autocomplete="off" aria-label="GitHub 访问令牌"><button type="button" class="btn" id="gh-connect">连接</button></div>
+      <div class="row"><span class="hint" id="gh-msg" role="status"></span><button type="button" class="btn" id="gh-off" hidden>断开</button></div>
+    </div>
     <h3>备份</h3>
     <p class="hint">没有登录时，标记只存在这台设备的这个浏览器里。换设备或清理浏览器数据前，把下面的备份文字存好；在新设备上粘贴后点“导入”。</p>
     <textarea id="backup" aria-label="备份文字" spellcheck="false"></textarea>
@@ -371,7 +377,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   }
   function load() { try { adopt(JSON.parse(localStorage.getItem(KEY))); } catch (e) {} }
   function store() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
-  function save() { store(); touch(); }
+  function save() { store(); touch(); ghTouch(); }
 
   const cur = () => listById.get(state.list);
   const isBook = () => { const l = cur(); return !!(l && l.kind === 'book'); };
@@ -786,7 +792,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     }).catch((e) => setSyncNote('同步失败：' + errText(e)));
   }
   function mergeIn(r) { // first sign-in on this browser: keep both sides, cloud wins a conflict
-    state.marks = { ...state.marks, ...(r.marks || {}) };
+    for (const [id, v] of Object.entries(r.marks || {})) if (state.marks[id] !== 'seen') state.marks[id] = v; // "seen" is never downgraded
     for (const [id, bag] of Object.entries(r.avail || {})) state.avail[id] = { ...(state.avail[id] || {}), ...bag };
     if (Array.isArray(r.sources) && r.sources.length) {
       const ids = new Set(r.sources.map((x) => x.id));
@@ -936,6 +942,76 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   }
 
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
+  // ---- automatic save to a private GitHub repository (needs a token that can write that repository's contents)
+  const GH = window.PIANDAN_GITHUB, GH_KEY = 'pianDan.gh';
+  let gh = { token: '', synced: false, dirty: false }, ghSha = null, ghTimer = 0, ghBusy = false, ghAgain = false;
+  try { Object.assign(gh, JSON.parse(localStorage.getItem(GH_KEY)) || {}); } catch (e) {}
+  const ghSave = () => { try { localStorage.setItem(GH_KEY, JSON.stringify(gh)); } catch (e) {} };
+  const ghSay = (t) => { $('#gh-msg').textContent = t; $('#gh-off').hidden = !gh.token; };
+  const b64 = (t) => { let o = ''; for (const c of new TextEncoder().encode(t)) o += String.fromCharCode(c); return btoa(o); };
+  const unb64 = (t) => new TextDecoder().decode(Uint8Array.from(atob(t.replace(/\s/g, '')), (c) => c.charCodeAt(0)));
+  async function ghApi(method, body) {
+    const url = `https://api.github.com/repos/${GH.repo}/contents/${GH.path}` + (method === 'GET' ? `?ref=${encodeURIComponent(GH.branch)}&t=${Date.now()}` : '');
+    const r = await fetch(url, { method, cache: 'no-store', headers: { Authorization: `Bearer ${gh.token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }, body: body ? JSON.stringify(body) : undefined });
+    if (r.status === 404 && method === 'GET') return null;
+    if (!r.ok) { const e = new Error(String(r.status)); e.status = r.status; throw e; }
+    return r.json();
+  }
+  const ghWhy = (e) => (e.status === 401 ? '令牌无效或已过期，请重新生成后再连接。' : e.status === 403 || e.status === 404 ? '令牌没有这个仓库的读写权限。' : '暂时连不上 GitHub，稍后会自动重试。');
+  // Read the saved copy and fold it in. The first time on this browser, and whenever local changes are
+  // still unsaved, both sides are kept; otherwise the saved copy is the truth.
+  async function ghPull() {
+    if (!GH || !gh.token || ghBusy) return;
+    ghBusy = true;
+    try {
+      const file = await ghApi('GET');
+      const text = file ? unb64(file.content) : '';
+      const remote = text ? parse(text) : null;
+      ghSha = file ? file.sha : null;
+      if (remote) { if (!gh.synced || gh.dirty) mergeIn(remote); else if (text !== payload()) adopt(remote); migrate(); refreshAll(); }
+      const need = !remote || payload() !== text;
+      gh.synced = true; gh.dirty = need; ghSave();
+      ghSay(need ? '正在保存…' : '已保存到 GitHub');
+      ghBusy = false;
+      if (need) await ghPush();
+    } catch (e) { ghBusy = false; ghSay(ghWhy(e)); }
+  }
+  async function ghPush() {
+    if (!GH || !gh.token) return;
+    if (ghBusy) { ghAgain = true; return; }
+    ghBusy = true; ghAgain = false;
+    const body = payload();
+    try {
+      const res = await ghApi('PUT', { message: 'Save marks', branch: GH.branch, content: b64(body), ...(ghSha ? { sha: ghSha } : {}) });
+      ghSha = res.content.sha;
+      if (body === payload()) { gh.dirty = false; ghSave(); }
+      ghSay('已保存到 GitHub');
+      ghBusy = false;
+      if (ghAgain || body !== payload()) ghPush();
+    } catch (e) {
+      ghBusy = false;
+      if (e.status === 409 || e.status === 422) { await ghPull(); return; } // the file changed underneath: merge, then save again
+      ghSay(ghWhy(e));
+    }
+  }
+  function ghTouch() {
+    if (!GH || !gh.token) return;
+    gh.dirty = true; ghSave(); ghSay('正在保存…');
+    clearTimeout(ghTimer); ghTimer = setTimeout(ghPush, 1500);
+  }
+  if (GH && GH.repo) {
+    $('#gh-box').hidden = false;
+    $('#gh-connect').addEventListener('click', () => {
+      const t = $('#gh-token').value.trim();
+      if (!t) { ghSay('先把令牌粘贴到左边的框里。'); return; }
+      gh = { token: t, synced: false, dirty: false }; ghSave(); $('#gh-token').value = ''; ghSay('正在连接…'); ghPull();
+    });
+    $('#gh-off').addEventListener('click', () => { gh = { token: '', synced: false, dirty: false }; ghSave(); ghSha = null; ghSay('已断开。这个浏览器里的标记还在。'); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && gh.token && !gh.dirty) ghPull(); });
+    window.addEventListener('online', () => { if (gh.token) ghPull(); });
+    ghSay(gh.token ? '已连接' : '');
+  }
+
   load();
   render();
   initSync();
@@ -952,6 +1028,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       if (!listById.has(state.list)) state.list = '';
       migrate(); store(); render();
       if (user && gated.size && !unlocked) unlock(user);
+      ghPull();
     })
     .catch(() => { $('#home-sum').textContent = '榜单没有载入成功，刷新页面再试一次。'; });
 })();
