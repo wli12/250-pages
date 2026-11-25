@@ -298,7 +298,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   <div class="dlg">
     <div class="dlg-head"><h2>播放源与备份</h2><button type="button" class="x" data-close aria-label="关闭">×</button></div>
     <h3>播放源</h3>
-    <p class="hint">搜索网址里用 <code>{q}</code> 代表片名；网址里没有 <code>{q}</code> 的，点击时会自动复制片名，到站内搜索框粘贴。在对应网站搜一次，把地址栏里的片名换成 <code>{q}</code> 贴进来即可。没勾“每部片都显示”的播放源，只在已知有这部片时出现。</p>
+    <p class="hint">搜索网址里用 <code>{q}</code> 代表片名；网址里没有 <code>{q}</code> 的，点击时会自动复制片名，到站内搜索框粘贴。在对应网站搜一次，把地址栏里的片名换成 <code>{q}</code> 贴进来即可。影片下面只显示能直接打开播放页的来源；搜索网址只在“记录播放网址”里用来帮你找到播放页。</p>
     <div class="srcs" id="cfg-list"></div>
     <div class="row"><button type="button" class="btn" id="add-src">添加播放源</button></div>
     <h3>备份</h3>
@@ -531,12 +531,10 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       const others = (memberOf.get(f.id) || []).filter((x) => x.l !== l);
       const also = others.slice(0, 4).map((x) => `${esc(x.l.name)}${x.l.tone === 'award' ? '' : ` 第 ${x.rank} 名`}`).join('、') + (others.length > 4 ? ` 等 ${others.length} 个榜单` : '');
       const chips = sources().map((s) => {
-        const i = srcInfo(f, s), su = searchUrl(s, f), name = esc(s.name);
+        const i = srcInfo(f, s), name = esc(s.name);
         if (i.mine) return `<a class="chip play" href="${esc(i.mine)}" target="_blank" rel="noopener">▶ ${name}</a>`;
         if (i.listed) return `<a class="chip has" href="${esc(i.listed)}" target="_blank" rel="noopener">▶ ${name}</a>`;
-        if (i.no) return s.pin ? `<span class="chip none" title="已标记为没有">${name}</span>` : '';
-        if (!su || !(s.pin || i.has)) return '';
-        return `<a class="chip${i.has ? ' has' : ''}" href="${esc(su)}" target="_blank" rel="noopener"${(s.tpl || '').includes('{q}') ? '' : ' data-copy-title'}>${name} <small>${i.has ? '有 · 去搜' : '去搜'}</small></a>`;
+        return ''; // only sources with a page that opens straight to the film are shown
       }).join('');
       return `<li class="tile${m === 'seen' ? ' is-seen' : ''}" data-id="${esc(f.id)}">
         <div class="card-top">
@@ -609,7 +607,6 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
         <input id="cfg-tag-${i}" data-k="tag" value="${esc(s.tag || '')}" maxlength="2" placeholder="简称" aria-label="简称">
         <button type="button" class="btn danger" data-del>删除</button>
         <input id="cfg-tpl-${i}" class="tpl" data-k="tpl" value="${esc(s.tpl || '')}" placeholder="https://example.com/search/{q}" aria-label="搜索网址">
-        <label class="pin"><input type="checkbox" id="cfg-pin-${i}" data-k="pin" ${s.pin ? 'checked' : ''}> 每部片都显示（没有已知播放页时给搜索链接）</label>
       </div>`).join('');
   }
 
