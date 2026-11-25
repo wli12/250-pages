@@ -142,6 +142,8 @@ main.inner { padding-block: 14px 56px; display: flex; flex-direction: column; ga
 .stars i { position: absolute; left: 0; top: 0; overflow: hidden; white-space: nowrap; color: var(--star); font-style: normal; }
 .stars i::before { content: "★★★★★"; }
 .orig { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.ext { display: inline-flex; align-items: baseline; gap: 4px; text-decoration: none; background: var(--soft); color: var(--ink); border-radius: 999px; padding: 2px 10px; font-size: 13px; font-weight: 400; white-space: nowrap; }
+.ext b { color: var(--star); font-weight: 700; }
 .rate small { font-weight: 400; color: var(--muted); font-size: 12px; }
 .meta { font-size: 13px; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
 .quote { font-size: 14px; color: var(--ink); opacity: .85; overflow-wrap: anywhere; }
@@ -379,7 +381,8 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     state.list = id; ui.filter = 'all'; ui.q = ''; $('#q').value = '';
     store();
     const h = id ? 'l-' + id : '';
-    if (location.hash.slice(1) !== h) location.hash = h; else render();
+    render();
+    if (location.hash.slice(1) !== h) location.hash = h;
     window.scrollTo(0, 0);
   }
   const srcOf = (f, sid) => (state.avail[f.id] || {})[sid] || {};
@@ -514,6 +517,12 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       </li>`;
       }
       const img = /^posters\/[\w.-]+$/.test(f.img || '') ? f.img : '';
+      const imdbUrl = f.tt ? `https://www.imdb.com/title/${esc(f.tt)}/` : `https://www.imdb.com/find/?q=${encodeURIComponent(f.orig || f.zh)}`;
+      const imdbScore = l.id === 'im' ? r.score : (f.imdb ? f.imdb.score : null);
+      const star = l.id === 'im' ? r.score : (f.ds != null ? f.ds : imdbScore);
+      const links = `${star != null ? `<span class="stars" aria-hidden="true"><i style="width:${Math.min(100, star * 10)}%"></i></span>` : ''}`
+        + (f.did ? `<a class="ext" href="https://movie.douban.com/subject/${esc(f.did)}/" target="_blank" rel="noopener">豆瓣${f.ds != null ? ` <b>${f.ds}</b>` : ''}${f.votes ? ` <small>${fmtVotes(f.votes)}人</small>` : ''} ↗</a>` : '')
+        + `<a class="ext" href="${imdbUrl}" target="_blank" rel="noopener">IMDb${imdbScore != null ? ` <b>${imdbScore}</b>` : ''} ↗</a>`;
       const meta = [f.year, f.region, f.genre, f.dir, f.cast].filter(Boolean).join(' / ');
       const others = (memberOf.get(f.id) || []).filter((x) => x.l !== l);
       const also = others.slice(0, 4).map((x) => `${esc(x.l.name)}${x.l.tone === 'award' ? '' : ` 第 ${x.rank} 名`}`).join('、') + (others.length > 4 ? ` 等 ${others.length} 个榜单` : '');
@@ -527,11 +536,11 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       }).join('');
       return `<li class="tile${m === 'seen' ? ' is-seen' : ''}" data-id="${esc(f.id)}">
         <div class="card-top">
-          <button type="button" class="poster" data-open aria-label="${esc(f.zh)}：详情">${img ? `<img src="${esc(img)}" alt="" loading="lazy" decoding="async">` : `<span class="ph">${esc(f.zh)}</span>`}<span class="rk">${r.rank}</span></button>
+          <div class="poster">${img ? `<img src="${esc(img)}" alt="" loading="lazy" decoding="async">` : `<span class="ph">${esc(f.zh)}</span>`}<span class="rk">${r.rank}</span></div>
           <div class="info">
-            <button type="button" class="name" data-open>${esc(f.zh)}</button>
+            <div class="name">${esc(f.zh)}</div>
             ${f.orig && f.orig !== f.zh ? `<div class="orig">${esc(f.orig)}</div>` : ''}
-            ${rate || note ? `<div class="rate">${rate}${note}</div>` : ''}
+            <div class="rate">${links}${note}</div>
             <div class="meta">${esc(meta)}</div>
             ${f.aka ? `<div class="meta">又名：${esc(f.aka)}</div>` : ''}
             ${also ? `<div class="meta">也在：${also}</div>` : ''}
@@ -892,6 +901,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     renderAccount();
   }
 
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
   load();
   render();
   initSync();
