@@ -263,7 +263,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   const KEY = 'pianDan.v1';
   const DEFAULT_SOURCES = [
     // pin: show on every film (as a search link when no play page is known)
-    { id: 'ole', name: '欧乐影院', tag: '欧', tpl: 'https://www.olevod.com/search/{q}', pin: true },
+    { id: 'ole', name: '欧乐影院', tag: '欧', tpl: 'https://www.olevod.com/search?q={q}', pin: true },
     { id: 'iyf', name: '爱壹帆', tag: '帆', tpl: 'https://www.iyf.tv/search/{q}', pin: true },
     { id: 'qq', name: '腾讯视频', tag: '腾', tpl: 'https://v.qq.com/x/search/?q={q}' },
     { id: 'iqiyi', name: '爱奇艺', tag: '奇', tpl: 'https://so.iqiyi.com/so/q_{q}' },
@@ -273,7 +273,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     { id: 'migu', name: '咪咕视频', tag: '咪', tpl: '' },
     { id: 'm1905', name: '1905电影网', tag: '19', tpl: 'https://www.1905.com/search/?q={q}' },
   ];
-  const SRC_VER = 2;
+  const SRC_VER = 3;
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const safeUrl = (u) => (/^https?:\/\//i.test((u || '').trim()) ? u.trim() : '');
@@ -298,6 +298,8 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   // Saved source lists from before the platform sources existed gain them once.
   function upgradeSources() {
     if (state.srcVer >= SRC_VER) return;
+    // the first olevod search address was a guess that the site redirects to its home page
+    for (const s of state.sources) if (s.id === 'ole' && s.tpl === 'https://www.olevod.com/search/{q}') s.tpl = 'https://www.olevod.com/search?q={q}';
     const ids = new Set(DEFAULT_SOURCES.map((s) => s.id));
     for (const s of state.sources) if (s.pin == null) s.pin = !ids.has(s.id) || s.id === 'ole' || s.id === 'iyf';
     const have = new Set(state.sources.map((s) => s.id));
@@ -442,7 +444,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
           <button type="button" class="btn no" data-avail="0" aria-pressed="${v.a === 0}">没有</button>
         </div>
         <input type="url" id="direct-${esc(s.id)}" data-direct value="${esc(v.u || '')}" placeholder="找到后把播放页网址贴在这里，下次一键直达" aria-label="${esc(s.name)}播放页网址">
-        ${i.listed && !i.mine ? '<p class="hint">“播放”用的是豆瓣早年收录的播放页，可能已失效；失效的话点“没有”，或贴上新的网址。</p>' : ''}
+        ${i.listed && !i.mine ? '<p class="hint">“播放”用的是预先查到的页面，可能已失效；失效的话点“没有”，或贴上新的网址。</p>' : ''}
       </div>`;
     }).join('');
     $('#detail-body').innerHTML = `
