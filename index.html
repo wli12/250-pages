@@ -324,9 +324,9 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     { id: 'migu', name: '咪咕视频', tag: '咪', tpl: '' },
     { id: 'm1905', name: '1905电影网', tag: '19', tpl: 'https://www.1905.com/search/?q={q}' },
     { id: 'ole', name: '欧乐影院', tag: '欧', tpl: 'https://www.olevod.com/search?q={q}', pin: true },
-    { id: 'iyf', name: '爱壹帆', tag: '帆', tpl: 'https://m.iyf.tv/search', pin: true },
+    { id: 'iyf', name: '爱壹帆', tag: '帆', tpl: '' },
   ];
-  const SRC_VER = 5;
+  const SRC_VER = 6;
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const safeUrl = (u) => (/^https?:\/\//i.test((u || '').trim()) ? u.trim() : '');
@@ -360,7 +360,8 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     const have = new Set(state.sources.map((s) => s.id));
     for (const d of DEFAULT_SOURCES) if (!have.has(d.id)) state.sources.push({ ...d });
     // the first iyf address was a guess too; its search page takes the title typed in, not in the address
-    for (const s of state.sources) if (s.id === 'iyf' && s.tpl === 'https://www.iyf.tv/search/{q}') s.tpl = 'https://m.iyf.tv/search';
+    // no working iyf search address is known: drop the guessed ones, so iyf shows only where a real play page was saved
+    for (const s of state.sources) if (s.id === 'iyf' && ['https://www.iyf.tv/search/{q}', 'https://m.iyf.tv/search'].includes(s.tpl)) { s.tpl = ''; s.pin = false; }
     // olevod and iyf sit after the platform sources
     const last = (s) => (s.id === 'ole' ? 1 : s.id === 'iyf' ? 2 : 0);
     state.sources = state.sources.map((s, i) => [s, i]).sort((a, b) => last(a[0]) - last(b[0]) || a[1] - b[1]).map((x) => x[0]);
