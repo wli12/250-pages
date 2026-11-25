@@ -388,10 +388,14 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   const srcOf = (f, sid) => (state.avail[f.id] || {})[sid] || {};
   // What we know about a film on a source: the viewer's own notes first, then the play page Douban listed.
   function srcInfo(f, s) {
-    const v = srcOf(f, s.id), mine = safeUrl(v.u), listed = v.a === 0 ? '' : safeUrl((f.play || {})[s.id]);
+    const v = srcOf(f, s.id), mine = safeUrl(v.u), listed = v.a === 0 ? '' : safeUrl((f.play || {})[s.id] || (unlocked && gated.has(s.id) && (privLinks[f.id] || (f.alt && privLinks[f.alt]) || {})[s.id]));
     return { v, mine, listed, direct: mine || listed, has: v.a === 1 || !!(mine || listed), no: v.a === 0 };
   }
-  const srcById = (sid) => state.sources.find((s) => s.id === sid);
+  // Members-only sources: hidden from everyone until an allow-listed account unlocks them.
+  let gated = new Set(), unlocked = false, privLinks = {};
+  const shown = (s) => !gated.has(s.id) || unlocked;
+  const sources = () => state.sources.filter(shown);
+  const srcById = (sid) => sources().find((s) => s.id === sid);
   const fmtVotes = (n) => (n >= 10000 ? (n / 10000).toFixed(1) + ' 万' : String(n));
   function setSrc(f, sid, patch) {
     const cur = { ...srcOf(f, sid), ...patch };
@@ -469,8 +473,8 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     const sel = $('#src-filter');
     sel.hidden = book;
     sel.innerHTML = '<option value="">播放源不限</option>' +
-      state.sources.map((s) => `<option value="${esc(s.id)}">${esc(s.name)}有</option>`).join('');
-    if (book || !state.sources.some((s) => s.id === ui.src)) ui.src = '';
+      sources().map((s) => `<option value="${esc(s.id)}">${esc(s.name)}有</option>`).join('');
+    if (book || !sources().some((s) => s.id === ui.src)) ui.src = '';
     sel.value = ui.src;
 
     const p = progress(l);
@@ -526,7 +530,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       const meta = [f.year, f.region, f.genre, f.dir, f.cast].filter(Boolean).join(' / ');
       const others = (memberOf.get(f.id) || []).filter((x) => x.l !== l);
       const also = others.slice(0, 4).map((x) => `${esc(x.l.name)}${x.l.tone === 'award' ? '' : ` 第 ${x.rank} 名`}`).join('、') + (others.length > 4 ? ` 等 ${others.length} 个榜单` : '');
-      const chips = state.sources.map((s) => {
+      const chips = sources().map((s) => {
         const i = srcInfo(f, s), su = searchUrl(s, f), name = esc(s.name);
         if (i.mine) return `<a class="chip play" href="${esc(i.mine)}" target="_blank" rel="noopener">▶ ${name}</a>`;
         if (i.listed) return `<a class="chip has" href="${esc(i.listed)}" target="_blank" rel="noopener">▶ ${name}</a>`;
@@ -567,7 +571,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     ranks.push(`<a href="${imdbUrl}" target="_blank" rel="noopener">IMDb${f.imdb ? ` · ${f.imdb.score}` : ''} ↗</a>`);
     const inLists = (memberOf.get(f.id) || []).map((x) => `${esc(x.l.name)}${x.l.tone === 'award' ? '' : ` #${x.rank}`}`).join(' · ');
     const sub = [f.orig, f.year, f.region, f.genre, f.dir, f.cast].filter(Boolean).join(' / ');
-    const srcs = state.sources.map((s) => {
+    const srcs = sources().map((s) => {
       const i = srcInfo(f, s), v = i.v, direct = i.direct, su = searchUrl(s, f);
       return `<div class="srow" data-sid="${esc(s.id)}">
         <div class="srow-top">
@@ -599,7 +603,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   }
 
   function renderSettings() {
-    $('#cfg-list').innerHTML = state.sources.map((s, i) => `
+    $('#cfg-list').innerHTML = state.sources.map((s, i) => !shown(s) ? '' : `
       <div class="srow cfg" data-i="${i}">
         <input id="cfg-name-${i}" data-k="name" value="${esc(s.name)}" placeholder="名称" aria-label="名称">
         <input id="cfg-tag-${i}" data-k="tag" value="${esc(s.tag || '')}" maxlength="2" placeholder="简称" aria-label="简称">
@@ -783,11 +787,29 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     if ($('#detail').open) renderDetail();
     if ($('#settings').open) renderSettings();
   }
+  // An allow-listed account can read the key document; with it the page decrypts the members-only links.
+  async function unlock(u) {
+    try {
+      const snap = await fb.firestore().collection('private').doc('key').get();
+      const k = snap.exists && snap.data().k;
+      if (!k || user !== u) return;
+      const bytes = (b64) => Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
+      const raw = bytes((await (await fetch('data/private.enc')).text()).trim());
+      const key = await crypto.subtle.importKey('raw', bytes(k), 'AES-GCM', false, ['decrypt']);
+      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: raw.slice(0, 12) }, key, raw.slice(12));
+      if (user !== u) return;
+      privLinks = JSON.parse(new TextDecoder().decode(plain)); unlocked = true;
+      refreshAll(); renderAccount();
+    } catch (e) { /* not on the allow-list, or offline: the members-only sources stay hidden */ }
+  }
   function onUser(u) {
     if (unsub) { unsub(); unsub = null; }
     clearTimeout(pushTimer);
     user = u; docRef = null; syncNote = '';
+    unlocked = false; privLinks = {};
+    if (u && gated.size) unlock(u);
     renderAccount();
+    if (loaded) render();
     if (!u) return;
     const ref = docRef = fb.firestore().collection('users').doc(u.uid);
     setSyncNote('正在读取云端的标记…');
@@ -821,6 +843,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
         <div class="who">${esc(user.email || user.displayName || '')}</div>
         <p class="hint" role="status">${esc(syncNote)}</p>
         <p class="hint">标记和播放源会自动保存到云端；在别的设备上用同一个账号登录就能看到。</p>
+        ${unlocked ? '<p class="hint">这个账号已开通会员播放源。</p>' : ''}
         <div class="row"><button type="button" class="btn" data-signout>退出登录</button></div>
         <p class="hint">退出后，这台设备上的标记仍会保留。</p>`;
     } else if (pendingLink) {
@@ -908,7 +931,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   fetch('data/movies.json')
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((d) => {
-      films = d.films; meta = d; lists = d.lists || [];
+      films = d.films; meta = d; lists = d.lists || []; gated = new Set(d.gated || []);
       byId = new Map([...films, ...(d.books || [])].map((f) => [f.id, f]));
       listById = new Map(lists.map((l) => [l.id, l]));
       for (const l of lists) for (const r of l.items) { if (!memberOf.has(r.f)) memberOf.set(r.f, []); memberOf.get(r.f).push({ l, rank: r.rank }); }
@@ -917,6 +940,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       if (h !== null) state.list = h;
       if (!listById.has(state.list)) state.list = '';
       migrate(); store(); render();
+      if (user && gated.size && !unlocked) unlock(user);
     })
     .catch(() => { $('#home-sum').textContent = '榜单没有载入成功，刷新页面再试一次。'; });
 })();
