@@ -170,6 +170,9 @@ main.inner { padding-block: 14px 56px; display: flex; flex-direction: column; ga
   .name { font-size: 22px; }
 }
 
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 30;
+  background: var(--ink); color: var(--bg); border-radius: 999px; padding: 8px 16px; font-size: 13px; max-width: calc(100vw - 32px); text-align: center; }
+
 /* dialogs */
 dialog {
   border: 0; border-radius: 18px; background: var(--surface); color: var(--ink);
@@ -283,6 +286,8 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
 </main>
 </div>
 
+<div id="toast" role="status" hidden></div>
+
 <dialog id="detail"><div class="dlg" id="detail-body"></div></dialog>
 
 <dialog id="account"><div class="dlg" id="account-body"></div></dialog>
@@ -291,7 +296,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   <div class="dlg">
     <div class="dlg-head"><h2>播放源与备份</h2><button type="button" class="x" data-close aria-label="关闭">×</button></div>
     <h3>播放源</h3>
-    <p class="hint">搜索网址里用 <code>{q}</code> 代表片名。在对应网站搜一次，把地址栏里的片名换成 <code>{q}</code> 贴进来即可。没勾“每部片都显示”的播放源，只在已知有这部片时出现。</p>
+    <p class="hint">搜索网址里用 <code>{q}</code> 代表片名；网址里没有 <code>{q}</code> 的，点击时会自动复制片名，到站内搜索框粘贴。在对应网站搜一次，把地址栏里的片名换成 <code>{q}</code> 贴进来即可。没勾“每部片都显示”的播放源，只在已知有这部片时出现。</p>
     <div class="srcs" id="cfg-list"></div>
     <div class="row"><button type="button" class="btn" id="add-src">添加播放源</button></div>
     <h3>备份</h3>
@@ -319,9 +324,9 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     { id: 'migu', name: '咪咕视频', tag: '咪', tpl: '' },
     { id: 'm1905', name: '1905电影网', tag: '19', tpl: 'https://www.1905.com/search/?q={q}' },
     { id: 'ole', name: '欧乐影院', tag: '欧', tpl: 'https://www.olevod.com/search?q={q}', pin: true },
-    { id: 'iyf', name: '爱壹帆', tag: '帆', tpl: 'https://www.iyf.tv/search/{q}', pin: true },
+    { id: 'iyf', name: '爱壹帆', tag: '帆', tpl: 'https://m.iyf.tv/search', pin: true },
   ];
-  const SRC_VER = 4;
+  const SRC_VER = 5;
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const safeUrl = (u) => (/^https?:\/\//i.test((u || '').trim()) ? u.trim() : '');
@@ -354,6 +359,8 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     for (const s of state.sources) if (s.pin == null) s.pin = !ids.has(s.id) || s.id === 'ole' || s.id === 'iyf';
     const have = new Set(state.sources.map((s) => s.id));
     for (const d of DEFAULT_SOURCES) if (!have.has(d.id)) state.sources.push({ ...d });
+    // the first iyf address was a guess too; its search page takes the title typed in, not in the address
+    for (const s of state.sources) if (s.id === 'iyf' && s.tpl === 'https://www.iyf.tv/search/{q}') s.tpl = 'https://m.iyf.tv/search';
     // olevod and iyf sit after the platform sources
     const last = (s) => (s.id === 'ole' ? 1 : s.id === 'iyf' ? 2 : 0);
     state.sources = state.sources.map((s, i) => [s, i]).sort((a, b) => last(a[0]) - last(b[0]) || a[1] - b[1]).map((x) => x[0]);
@@ -515,7 +522,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
         if (i.listed) return `<a class="chip has" href="${esc(i.listed)}" target="_blank" rel="noopener">▶ ${name}</a>`;
         if (i.no) return s.pin ? `<span class="chip none" title="已标记为没有">${name}</span>` : '';
         if (!su || !(s.pin || i.has)) return '';
-        return `<a class="chip${i.has ? ' has' : ''}" href="${esc(su)}" target="_blank" rel="noopener">${name} <small>${i.has ? '有 · 去搜' : '去搜'}</small></a>`;
+        return `<a class="chip${i.has ? ' has' : ''}" href="${esc(su)}" target="_blank" rel="noopener"${(s.tpl || '').includes('{q}') ? '' : ' data-copy-title'}>${name} <small>${i.has ? '有 · 去搜' : '去搜'}</small></a>`;
       }).join('');
       return `<li class="tile${m === 'seen' ? ' is-seen' : ''}" data-id="${esc(f.id)}">
         <div class="card-top">
@@ -556,7 +563,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
         <div class="srow-top">
           <strong>${esc(s.name)}</strong>
           ${direct ? `<a class="btn go" href="${esc(direct)}" target="_blank" rel="noopener">播放 ↗</a>` : ''}
-          ${su ? `<a class="btn${direct ? '' : ' go'}" href="${esc(su)}" target="_blank" rel="noopener">搜这部片 ↗</a>` : ''}
+          ${su ? `<a class="btn${direct ? '' : ' go'}" href="${esc(su)}" target="_blank" rel="noopener"${(s.tpl || '').includes('{q}') ? '' : ' data-copy-title'}>搜这部片 ↗</a>` : ''}
           <button type="button" class="btn" data-avail="1" aria-pressed="${i.has}">有</button>
           <button type="button" class="btn no" data-avail="0" aria-pressed="${v.a === 0}">没有</button>
         </div>
@@ -591,6 +598,17 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
         <label class="pin"><input type="checkbox" id="cfg-pin-${i}" data-k="pin" ${s.pin ? 'checked' : ''}> 每部片都显示（没有已知播放页时给搜索链接）</label>
       </div>`).join('');
   }
+
+  // A source whose search address has no {q}: copy the title so it can be pasted into the site's search box.
+  let toastTimer = 0;
+  function toast(t) { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 3500); }
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-copy-title]');
+    if (!a) return;
+    const li = a.closest('.tile'), f = byId.get(li ? li.dataset.id : openId);
+    if (!f) return;
+    try { navigator.clipboard.writeText(f.zh).then(() => toast(`已复制“${f.zh}”，到搜索框里粘贴即可`), () => {}); } catch (err) {}
+  });
 
   // ---- events
   $('#sections').addEventListener('click', (e) => {
