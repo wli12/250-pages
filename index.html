@@ -105,11 +105,12 @@ main.inner { padding-block: 14px 56px; display: flex; flex-direction: column; ga
 }
 .info { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .name { border: 0; background: none; padding: 0; text-align: left; font-size: 19px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
-.rate { display: flex; align-items: center; gap: 6px; color: var(--star); font-weight: 700; font-variant-numeric: tabular-nums; }
+.rate { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; color: var(--star); font-weight: 700; font-variant-numeric: tabular-nums; }
 .stars { position: relative; display: inline-block; font-size: 14px; letter-spacing: 1px; line-height: 1; color: var(--line); }
 .stars::before { content: "★★★★★"; }
 .stars i { position: absolute; left: 0; top: 0; overflow: hidden; white-space: nowrap; color: var(--star); font-style: normal; }
 .stars i::before { content: "★★★★★"; }
+.orig { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .rate small { font-weight: 400; color: var(--muted); font-size: 12px; }
 .meta { font-size: 13px; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
 .quote { font-size: 14px; color: var(--ink); opacity: .85; overflow-wrap: anywhere; }
@@ -172,7 +173,10 @@ h3 { margin: 0; font-size: 12px; letter-spacing: .1em; color: var(--muted); font
   width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 8px; font-size: 13px; min-width: 0;
 }
 .cfg { display: grid; grid-template-columns: 1fr 52px auto; gap: 6px; }
-.cfg .tpl { grid-column: 1 / -1; }
+.cfg .tpl, .cfg .pin { grid-column: 1 / -1; }
+.cfg .pin { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.cfg .pin input { width: auto; }
+#settings .srcs { max-height: 46vh; overflow-y: auto; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; background: var(--bg); }
 .hint { font-size: 12px; color: var(--muted); margin: 0; }
@@ -239,7 +243,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   <div class="dlg">
     <div class="dlg-head"><h2>播放源与备份</h2><button type="button" class="x" data-close aria-label="关闭">×</button></div>
     <h3>播放源</h3>
-    <p class="hint">搜索网址里用 <code>{q}</code> 代表片名。在对应网站搜一次，把地址栏里的片名换成 <code>{q}</code> 贴进来即可。简称会显示在影片格子上。</p>
+    <p class="hint">搜索网址里用 <code>{q}</code> 代表片名。在对应网站搜一次，把地址栏里的片名换成 <code>{q}</code> 贴进来即可。没勾“每部片都显示”的播放源，只在已知有这部片时出现。</p>
     <div class="srcs" id="cfg-list"></div>
     <div class="row"><button type="button" class="btn" id="add-src">添加播放源</button></div>
     <h3>备份</h3>
@@ -258,15 +262,24 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
 (() => {
   const KEY = 'pianDan.v1';
   const DEFAULT_SOURCES = [
-    { id: 'ole', name: '欧乐影院', tag: '欧', tpl: 'https://www.olevod.com/search/{q}' },
-    { id: 'iyf', name: '爱壹帆', tag: '帆', tpl: 'https://www.iyf.tv/search/{q}' },
+    // pin: show on every film (as a search link when no play page is known)
+    { id: 'ole', name: '欧乐影院', tag: '欧', tpl: 'https://www.olevod.com/search/{q}', pin: true },
+    { id: 'iyf', name: '爱壹帆', tag: '帆', tpl: 'https://www.iyf.tv/search/{q}', pin: true },
+    { id: 'qq', name: '腾讯视频', tag: '腾', tpl: 'https://v.qq.com/x/search/?q={q}' },
+    { id: 'iqiyi', name: '爱奇艺', tag: '奇', tpl: 'https://so.iqiyi.com/so/q_{q}' },
+    { id: 'youku', name: '优酷', tag: '优', tpl: 'https://so.youku.com/search_video/q_{q}' },
+    { id: 'bili', name: '哔哩哔哩', tag: 'B', tpl: 'https://search.bilibili.com/all?keyword={q}' },
+    { id: 'mgtv', name: '芒果TV', tag: '芒', tpl: 'https://so.mgtv.com/so?k={q}' },
+    { id: 'migu', name: '咪咕视频', tag: '咪', tpl: '' },
+    { id: 'm1905', name: '1905电影网', tag: '19', tpl: 'https://www.1905.com/search/?q={q}' },
   ];
+  const SRC_VER = 2;
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const safeUrl = (u) => (/^https?:\/\//i.test((u || '').trim()) ? u.trim() : '');
 
   // marks: { filmId: 'seen' | 'want' }; avail: { filmId: { sourceId: { a: 1 | 0, u: url } } }
-  let state = { marks: {}, avail: {}, sources: DEFAULT_SOURCES.map((s) => ({ ...s })), list: 'db' };
+  let state = { marks: {}, avail: {}, sources: DEFAULT_SOURCES.map((s) => ({ ...s })), srcVer: SRC_VER, list: 'db' };
   let ui = { filter: 'all', src: '', q: '' };
   let films = [], meta = {}, byId = new Map(), openId = null;
 
@@ -274,9 +287,22 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     if (!o || typeof o !== 'object') return false;
     state.marks = o.marks && typeof o.marks === 'object' ? o.marks : {};
     state.avail = o.avail && typeof o.avail === 'object' ? o.avail : {};
-    if (Array.isArray(o.sources) && o.sources.length) state.sources = o.sources.filter((s) => s && s.id);
+    if (Array.isArray(o.sources) && o.sources.length) {
+      state.sources = o.sources.filter((s) => s && s.id);
+      state.srcVer = Number(o.srcVer) || 1;
+      upgradeSources();
+    }
     if (o.list === 'db' || o.list === 'im') state.list = o.list;
     return true;
+  }
+  // Saved source lists from before the platform sources existed gain them once.
+  function upgradeSources() {
+    if (state.srcVer >= SRC_VER) return;
+    const ids = new Set(DEFAULT_SOURCES.map((s) => s.id));
+    for (const s of state.sources) if (s.pin == null) s.pin = !ids.has(s.id) || s.id === 'ole' || s.id === 'iyf';
+    const have = new Set(state.sources.map((s) => s.id));
+    for (const d of DEFAULT_SOURCES) if (!have.has(d.id)) state.sources.push({ ...d });
+    state.srcVer = SRC_VER;
   }
   function load() { try { adopt(JSON.parse(localStorage.getItem(KEY))); } catch (e) {} }
   function store() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
@@ -284,6 +310,13 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
 
   const inList = (f, l) => (l === 'db' ? f.db : f.imdb);
   const srcOf = (f, sid) => (state.avail[f.id] || {})[sid] || {};
+  // What we know about a film on a source: the viewer's own notes first, then the play page Douban listed.
+  function srcInfo(f, s) {
+    const v = srcOf(f, s.id), mine = safeUrl(v.u), listed = v.a === 0 ? '' : safeUrl((f.play || {})[s.id]);
+    return { v, mine, listed, direct: mine || listed, has: v.a === 1 || !!(mine || listed), no: v.a === 0 };
+  }
+  const srcById = (sid) => state.sources.find((s) => s.id === sid);
+  const fmtVotes = (n) => (n >= 10000 ? (n / 10000).toFixed(1) + ' 万' : String(n));
   function setSrc(f, sid, patch) {
     const cur = { ...srcOf(f, sid), ...patch };
     if (cur.a == null) delete cur.a;
@@ -308,7 +341,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
         if (ui.filter === 'seen' && m !== 'seen') return false;
         if (ui.filter === 'want' && m !== 'want') return false;
         if (ui.filter === 'todo' && m === 'seen') return false;
-        if (ui.src && srcOf(f, ui.src).a !== 1) return false;
+        if (ui.src && !(srcById(ui.src) && srcInfo(f, srcById(ui.src)).has)) return false;
         if (q && !`${f.zh} ${f.orig} ${f.dir || ''} ${f.cast || ''} ${f.genre || ''} ${f.year}`.toLowerCase().includes(q)) return false;
         return true;
       })
@@ -351,20 +384,26 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       const r = inList(f, state.list), m = state.marks[f.id];
       const img = safeUrl(f.img);
       const meta = [f.year, f.region, f.genre, f.dir, f.cast].filter(Boolean).join(' / ');
+      const o = state.list === 'db' ? f.imdb : f.db;
+      const other = o ? `${state.list === 'db' ? 'IMDb' : '豆瓣'} Top 250 第 ${o.rank} 名（${o.score}）` : '';
       const chips = state.sources.map((s) => {
-        const v = srcOf(f, s.id), direct = safeUrl(v.u), su = searchUrl(s, f), name = esc(s.name);
-        if (direct) return `<a class="chip play" href="${esc(direct)}" target="_blank" rel="noopener">▶ ${name}</a>`;
-        if (v.a === 0) return `<span class="chip none" title="已标记为没有">${name}</span>`;
-        if (!su) return '';
-        return `<a class="chip${v.a === 1 ? ' has' : ''}" href="${esc(su)}" target="_blank" rel="noopener">${name} <small>${v.a === 1 ? '有 · 去搜' : '去搜'}</small></a>`;
+        const i = srcInfo(f, s), su = searchUrl(s, f), name = esc(s.name);
+        if (i.mine) return `<a class="chip play" href="${esc(i.mine)}" target="_blank" rel="noopener">▶ ${name}</a>`;
+        if (i.listed) return `<a class="chip has" href="${esc(i.listed)}" target="_blank" rel="noopener">▶ ${name}</a>`;
+        if (i.no) return s.pin ? `<span class="chip none" title="已标记为没有">${name}</span>` : '';
+        if (!su || !(s.pin || i.has)) return '';
+        return `<a class="chip${i.has ? ' has' : ''}" href="${esc(su)}" target="_blank" rel="noopener">${name} <small>${i.has ? '有 · 去搜' : '去搜'}</small></a>`;
       }).join('');
       return `<li class="tile${m === 'seen' ? ' is-seen' : ''}" data-id="${esc(f.id)}">
         <div class="card-top">
           <button type="button" class="poster" data-open aria-label="${esc(f.zh)}：详情">${img ? `<img src="${esc(img)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : ''}<span class="rk">${r.rank}</span></button>
           <div class="info">
             <button type="button" class="name" data-open>${esc(f.zh)}</button>
-            <div class="rate"><span class="stars" aria-hidden="true"><i style="width:${Math.min(100, r.score * 10)}%"></i></span>${r.score}<small>${brand}</small></div>
+            ${f.orig && f.orig !== f.zh ? `<div class="orig">${esc(f.orig)}</div>` : ''}
+            <div class="rate"><span class="stars" aria-hidden="true"><i style="width:${Math.min(100, r.score * 10)}%"></i></span>${r.score}<small>${brand}${state.list === 'db' && f.votes ? ` · ${fmtVotes(f.votes)}人评价` : ''}</small></div>
             <div class="meta">${esc(meta)}</div>
+            ${f.aka ? `<div class="meta">又名：${esc(f.aka)}</div>` : ''}
+            ${other ? `<div class="meta">同时位列 ${other}</div>` : ''}
             ${f.quote ? `<div class="quote">${esc(f.quote)}${/[。！？!?.…]$/.test(f.quote) ? '' : '。'}</div>` : ''}
           </div>
         </div>
@@ -393,22 +432,25 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     }
     const sub = [f.orig, f.year, f.region, f.genre, f.dir, f.cast].filter(Boolean).join(' / ');
     const srcs = state.sources.map((s) => {
-      const v = srcOf(f, s.id), direct = safeUrl(v.u), su = searchUrl(s, f);
+      const i = srcInfo(f, s), v = i.v, direct = i.direct, su = searchUrl(s, f);
       return `<div class="srow" data-sid="${esc(s.id)}">
         <div class="srow-top">
           <strong>${esc(s.name)}</strong>
           ${direct ? `<a class="btn go" href="${esc(direct)}" target="_blank" rel="noopener">播放 ↗</a>` : ''}
           ${su ? `<a class="btn${direct ? '' : ' go'}" href="${esc(su)}" target="_blank" rel="noopener">搜这部片 ↗</a>` : ''}
-          <button type="button" class="btn" data-avail="1" aria-pressed="${v.a === 1}">有</button>
+          <button type="button" class="btn" data-avail="1" aria-pressed="${i.has}">有</button>
           <button type="button" class="btn no" data-avail="0" aria-pressed="${v.a === 0}">没有</button>
         </div>
         <input type="url" id="direct-${esc(s.id)}" data-direct value="${esc(v.u || '')}" placeholder="找到后把播放页网址贴在这里，下次一键直达" aria-label="${esc(s.name)}播放页网址">
+        ${i.listed && !i.mine ? '<p class="hint">“播放”用的是豆瓣早年收录的播放页，可能已失效；失效的话点“没有”，或贴上新的网址。</p>' : ''}
       </div>`;
     }).join('');
     $('#detail-body').innerHTML = `
       <div class="dlg-head"><h2>${esc(f.zh)}</h2><button type="button" class="x" data-close aria-label="关闭">×</button></div>
       <div class="sub">${esc(sub)}</div>
       ${f.quote ? `<div class="quote">${esc(f.quote)}${/[。！？!?.…]$/.test(f.quote) ? '' : '。'}</div>` : ''}
+      ${f.aka ? `<div class="sub">又名：${esc(f.aka)}</div>` : ''}
+      ${f.votes ? `<div class="sub">豆瓣 ${fmtVotes(f.votes)}人评价</div>` : ''}
       <div class="ranks">${ranks.join('')}</div>
       <div class="marks">
         <button type="button" class="mk" data-mark="want" aria-pressed="${m === 'want'}">想看</button>
@@ -426,6 +468,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
         <input id="cfg-tag-${i}" data-k="tag" value="${esc(s.tag || '')}" maxlength="2" placeholder="简称" aria-label="简称">
         <button type="button" class="btn danger" data-del>删除</button>
         <input id="cfg-tpl-${i}" class="tpl" data-k="tpl" value="${esc(s.tpl || '')}" placeholder="https://example.com/search/{q}" aria-label="搜索网址">
+        <label class="pin"><input type="checkbox" id="cfg-pin-${i}" data-k="pin" ${s.pin ? 'checked' : ''}> 每部片都显示（没有已知播放页时给搜索链接）</label>
       </div>`).join('');
   }
 
@@ -488,18 +531,18 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   $('#cfg-list').addEventListener('input', (e) => {
     const row = e.target.closest('.cfg');
     if (!row || !e.target.dataset.k) return;
-    state.sources[Number(row.dataset.i)][e.target.dataset.k] = e.target.value.trim();
+    state.sources[Number(row.dataset.i)][e.target.dataset.k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value.trim();
     save();
   });
   $('#add-src').addEventListener('click', () => {
-    state.sources.push({ id: 's' + Date.now().toString(36), name: '', tag: '', tpl: '' });
+    state.sources.push({ id: 's' + Date.now().toString(36), name: '', tag: '', tpl: '', pin: true });
     save(); renderSettings();
     const rows = document.querySelectorAll('#cfg-list .cfg');
     rows[rows.length - 1].querySelector('input').focus();
   });
   $('#do-export').addEventListener('click', () => {
     const ta = $('#backup'), msg = $('#backup-msg');
-    ta.value = JSON.stringify({ app: 'pianDan', v: 1, marks: state.marks, avail: state.avail, sources: state.sources });
+    ta.value = JSON.stringify({ app: 'pianDan', v: 1, marks: state.marks, avail: state.avail, sources: state.sources, srcVer: state.srcVer });
     ta.select();
     try { navigator.clipboard.writeText(ta.value).then(() => { msg.textContent = '已复制到剪贴板'; }, () => { msg.textContent = '已选中，请手动复制'; }); }
     catch (err) { msg.textContent = '已选中，请手动复制'; }
@@ -534,7 +577,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
 
   try { Object.assign(sync, JSON.parse(localStorage.getItem(SYNC_KEY)) || {}); } catch (e) {}
   const saveSync = () => { try { localStorage.setItem(SYNC_KEY, JSON.stringify(sync)); } catch (e) {} };
-  const payload = () => JSON.stringify({ marks: state.marks, avail: state.avail, sources: state.sources });
+  const payload = () => JSON.stringify({ marks: state.marks, avail: state.avail, sources: state.sources, srcVer: state.srcVer });
   const parse = (t) => { try { const o = JSON.parse(t); return o && typeof o === 'object' ? o : null; } catch (e) { return null; } };
 
   const ERR = {
