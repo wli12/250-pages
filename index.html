@@ -94,6 +94,7 @@ main.inner { padding-block: 14px 56px; display: flex; flex-direction: column; ga
   position: relative; width: 88px; aspect-ratio: 27 / 40; border-radius: 8px; overflow: hidden; border: 0; padding: 0;
   background: var(--soft); align-self: start;
 }
+.poster .ph { position: absolute; inset: 0; display: grid; place-items: center; padding: 22px 6px 6px; text-align: center; font: 600 13px/1.35 var(--text); color: var(--muted); overflow: hidden; overflow-wrap: anywhere; }
 .poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .poster .rk {
   position: absolute; left: 0; top: 0; min-width: 26px; padding: 1px 7px 2px; border-radius: 0 0 8px 0;
@@ -263,8 +264,6 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   const KEY = 'pianDan.v1';
   const DEFAULT_SOURCES = [
     // pin: show on every film (as a search link when no play page is known)
-    { id: 'ole', name: '欧乐影院', tag: '欧', tpl: 'https://www.olevod.com/search?q={q}', pin: true },
-    { id: 'iyf', name: '爱壹帆', tag: '帆', tpl: 'https://www.iyf.tv/search/{q}', pin: true },
     { id: 'qq', name: '腾讯视频', tag: '腾', tpl: 'https://v.qq.com/x/search/?q={q}' },
     { id: 'iqiyi', name: '爱奇艺', tag: '奇', tpl: 'https://so.iqiyi.com/so/q_{q}' },
     { id: 'youku', name: '优酷', tag: '优', tpl: 'https://so.youku.com/search_video/q_{q}' },
@@ -272,8 +271,10 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     { id: 'mgtv', name: '芒果TV', tag: '芒', tpl: 'https://so.mgtv.com/so?k={q}' },
     { id: 'migu', name: '咪咕视频', tag: '咪', tpl: '' },
     { id: 'm1905', name: '1905电影网', tag: '19', tpl: 'https://www.1905.com/search/?q={q}' },
+    { id: 'ole', name: '欧乐影院', tag: '欧', tpl: 'https://www.olevod.com/search?q={q}', pin: true },
+    { id: 'iyf', name: '爱壹帆', tag: '帆', tpl: 'https://www.iyf.tv/search/{q}', pin: true },
   ];
-  const SRC_VER = 3;
+  const SRC_VER = 4;
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const safeUrl = (u) => (/^https?:\/\//i.test((u || '').trim()) ? u.trim() : '');
@@ -304,6 +305,9 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     for (const s of state.sources) if (s.pin == null) s.pin = !ids.has(s.id) || s.id === 'ole' || s.id === 'iyf';
     const have = new Set(state.sources.map((s) => s.id));
     for (const d of DEFAULT_SOURCES) if (!have.has(d.id)) state.sources.push({ ...d });
+    // olevod and iyf sit after the platform sources
+    const last = (s) => (s.id === 'ole' ? 1 : s.id === 'iyf' ? 2 : 0);
+    state.sources = state.sources.map((s, i) => [s, i]).sort((a, b) => last(a[0]) - last(b[0]) || a[1] - b[1]).map((x) => x[0]);
     state.srcVer = SRC_VER;
   }
   function load() { try { adopt(JSON.parse(localStorage.getItem(KEY))); } catch (e) {} }
@@ -384,7 +388,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     const rows = visible();
     $('#wall').innerHTML = rows.map((f) => {
       const r = inList(f, state.list), m = state.marks[f.id];
-      const img = safeUrl(f.img);
+      const img = /^posters\/[\w.-]+$/.test(f.img || '') ? f.img : '';
       const meta = [f.year, f.region, f.genre, f.dir, f.cast].filter(Boolean).join(' / ');
       const o = state.list === 'db' ? f.imdb : f.db;
       const other = o ? `${state.list === 'db' ? 'IMDb' : '豆瓣'} Top 250 第 ${o.rank} 名（${o.score}）` : '';
@@ -398,7 +402,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       }).join('');
       return `<li class="tile${m === 'seen' ? ' is-seen' : ''}" data-id="${esc(f.id)}">
         <div class="card-top">
-          <button type="button" class="poster" data-open aria-label="${esc(f.zh)}：详情">${img ? `<img src="${esc(img)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : ''}<span class="rk">${r.rank}</span></button>
+          <button type="button" class="poster" data-open aria-label="${esc(f.zh)}：详情">${img ? `<img src="${esc(img)}" alt="" loading="lazy" decoding="async">` : `<span class="ph">${esc(f.zh)}</span>`}<span class="rk">${r.rank}</span></button>
           <div class="info">
             <button type="button" class="name" data-open>${esc(f.zh)}</button>
             ${f.orig && f.orig !== f.zh ? `<div class="orig">${esc(f.orig)}</div>` : ''}
