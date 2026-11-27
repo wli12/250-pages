@@ -379,6 +379,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   function store() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
   function save() { store(); touch(); ghTouch(); }
 
+  const READERS = [['weread', '微信读书'], ['doubanread', '豆瓣阅读'], ['jd', '京东读书']]; // shown only where a page for the book itself is known
   const cur = () => listById.get(state.list);
   const isBook = () => { const l = cur(); return !!(l && l.kind === 'book'); };
   const GLYPH = { db: '豆', im: 'IMDb', boxoffice: '票', 'db-comedy': '喜', 'db-scifi': '科', 'db-mystery': '悬', 'db-romance': '爱', 'db-anim': '动', 'db-doc': '纪',
@@ -513,15 +514,14 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
           <div class="info">
             <div class="name">${esc(f.zh)}</div>
             ${f.orig ? `<div class="orig">${esc(f.orig)}</div>` : ''}
-            <div class="rate">${rate}</div>
+            <div class="rate">${f.ds != null ? `<span class="stars" aria-hidden="true"><i style="width:${Math.min(100, f.ds * 10)}%"></i></span>` : ''}<a class="ext" href="https://book.douban.com/subject/${esc(f.did)}/" target="_blank" rel="noopener">豆瓣 <b>${f.ds}</b>${f.votes ? ` <small>${fmtVotes(f.votes)}人</small>` : ''} ↗</a></div>
             <div class="meta">${esc([f.author, f.pub, f.year].filter(Boolean).join(' / '))}</div>
             ${quote}
           </div>
         </div>
         <div class="card-foot">
           <span class="chips">
-            <a class="chip" href="https://book.douban.com/subject/${esc(f.did)}/" target="_blank" rel="noopener">豆瓣读书 ↗</a>
-            <a class="chip" href="https://weread.qq.com/web/search/global?keyword=${encodeURIComponent(f.zh)}" target="_blank" rel="noopener">微信读书 <small>去搜</small></a>
+            ${READERS.map(([k, name]) => (f.read && safeUrl(f.read[k]) ? `<a class="chip has" href="${esc(f.read[k])}" target="_blank" rel="noopener">▶ ${name}</a>` : '')).join('')}
           </span>${acts}
         </div>
       </li>`;
