@@ -112,6 +112,7 @@ a { color: inherit; }
 .tabs button { border: 0; background: none; border-radius: 10px; padding: 8px 4px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tabs button[aria-pressed="true"] { background: var(--tint); color: var(--deep); font-weight: 700; }
 .finder { display: flex; gap: 8px; }
+.finder { flex-wrap: wrap; }
 .finder select, .finder input { border: 0; background: var(--soft); border-radius: 10px; padding: 8px 10px; min-width: 0; }
 .finder input { flex: 1; }
 
@@ -144,6 +145,9 @@ main.inner { padding-block: 14px 56px; display: flex; flex-direction: column; ga
 .orig { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .ext { display: inline-flex; align-items: baseline; gap: 4px; text-decoration: none; background: var(--soft); color: var(--ink); border-radius: 999px; padding: 2px 10px; font-size: 13px; font-weight: 400; white-space: nowrap; }
 .ext b { color: var(--star); font-weight: 700; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 2px; }
+.tag { border: 1px solid var(--line); background: none; border-radius: 6px; padding: 1px 8px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.tag.kind { border-color: transparent; background: var(--tint); color: var(--deep); font-weight: 600; }
 .rate small { font-weight: 400; color: var(--muted); font-size: 12px; }
 .meta { font-size: 13px; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
 .quote { font-size: 14px; color: var(--ink); opacity: .85; overflow-wrap: anywhere; }
@@ -275,6 +279,8 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     </div>
     <div class="finder">
       <select id="src-filter" aria-label="按播放源筛选"></select>
+      <select id="kind-filter" aria-label="虚构或非虚构" hidden></select>
+      <select id="genre-filter" aria-label="按题材筛选" hidden></select>
       <input id="q" type="search" placeholder="搜片名、导演、演员、类型" aria-label="搜索">
     </div>
   </div>
@@ -341,7 +347,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
 
   // marks: { filmId: 'seen' | 'want' }; avail: { filmId: { sourceId: { a: 1 | 0, u: url } } }
   let state = { marks: {}, avail: {}, sources: DEFAULT_SOURCES.map((s) => ({ ...s })), srcVer: SRC_VER, list: '', section: 'movie' };
-  let ui = { filter: 'todo', src: '', q: '' }; // a list opens on what is still unseen
+  let ui = { filter: 'todo', src: '', q: '', kind: '', genre: '' }; // a list opens on what is still unseen
   let lists = [], listById = new Map(), memberOf = new Map(), loaded = false;
   let films = [], meta = {}, byId = new Map(), openId = null;
 
@@ -385,7 +391,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   const GLYPH = { db: '豆', im: 'IMDb', boxoffice: '票', 'db-comedy': '喜', 'db-scifi': '科', 'db-mystery': '悬', 'db-romance': '爱', 'db-anim': '动', 'db-doc': '纪',
     'oscar-picture': '影', 'oscar-intl': '外', 'oscar-anim': '动', 'oscar-screenplay': '剧', 'oscar-vfx': '效', palme: '棕', 'oscar-doc': '纪', 'oscar-adapted': '改', 'oscar-short-anim': '动', 'oscar-short-live': '短', 'oscar-short-doc': '纪', 'book-db': '书' };
   function go(id) {
-    state.list = id; ui.filter = 'todo'; ui.q = ''; $('#q').value = '';
+    state.list = id; ui.filter = 'todo'; ui.q = ''; ui.kind = ''; ui.genre = ''; $('#q').value = '';
     store();
     const h = id ? 'l-' + id : '';
     render();
@@ -429,7 +435,9 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       if (ui.filter === 'want' && m !== 'want') return false;
       if (ui.filter === 'todo' && m === 'seen') return false;
       if (ui.src && !(srcById(ui.src) && srcInfo(f, srcById(ui.src)).has)) return false;
-      if (q && !`${f.zh} ${f.orig || ''} ${f.dir || ''} ${f.cast || ''} ${f.genre || ''} ${f.author || ''} ${f.year}`.toLowerCase().includes(q)) return false;
+      if (ui.kind && f.kind !== ui.kind) return false;
+      if (ui.genre && !(f.tags || []).includes(ui.genre)) return false;
+      if (q && !`${f.zh} ${f.orig || ''} ${f.dir || ''} ${f.cast || ''} ${f.genre || ''} ${f.author || ''} ${(f.tags || []).join(' ')} ${f.year}`.toLowerCase().includes(q)) return false;
       return true;
     });
   }
@@ -483,13 +491,31 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       sources().map((s) => `<option value="${esc(s.id)}">${esc(s.name)}有</option>`).join('');
     if (book || !sources().some((s) => s.id === ui.src)) ui.src = '';
     sel.value = ui.src;
+    // book lists: fiction / non-fiction and subject, each option counting what the other choice leaves
+    const KIND = { F: '虚构', N: '非虚构' };
+    const ks = $('#kind-filter'), gs = $('#genre-filter');
+    ks.hidden = gs.hidden = !book;
+    if (book) {
+      const all = l.items.map((r) => byId.get(r.f)).filter(Boolean);
+      const inGenre = all.filter((f) => !ui.genre || (f.tags || []).includes(ui.genre));
+      const inKind = all.filter((f) => !ui.kind || f.kind === ui.kind);
+      ks.innerHTML = `<option value="">虚构 + 非虚构</option>` + Object.entries(KIND).map(([k, n]) => `<option value="${k}">${n}（${inGenre.filter((f) => f.kind === k).length}）</option>`).join('');
+      const count = new Map();
+      for (const f of inKind) for (const t of f.tags || []) count.set(t, (count.get(t) || 0) + 1);
+      const allTags = new Map();
+      for (const f of all) for (const t of f.tags || []) allTags.set(t, (allTags.get(t) || 0) + 1);
+      gs.innerHTML = `<option value="">全部题材</option>` + [...allTags.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => `<option value="${esc(t)}">${esc(t)}（${count.get(t) || 0}）</option>`).join('');
+      ks.value = ui.kind; gs.value = ui.genre;
+    }
 
     const p = progress(l);
+    const sub = book && (ui.kind || ui.genre) ? l.items.filter((r) => { const f = byId.get(r.f); return f && (!ui.kind || f.kind === ui.kind) && (!ui.genre || (f.tags || []).includes(ui.genre)); }) : null;
+    const ps = sub ? progress({ items: sub }) : p;
     $('#n-seen').textContent = p.seen;
     $('#n-all').textContent = p.total;
     $('#pct').textContent = Math.round((p.seen / p.total) * 100) + '%';
     $('#bar').style.width = (p.seen / p.total) * 100 + '%';
-    const counts = { all: p.total, seen: p.seen, want: p.want, todo: p.total - p.seen };
+    const counts = { all: ps.total, seen: ps.seen, want: ps.want, todo: ps.total - ps.seen };
     const labels = { all: '全部', ...W };
     document.querySelectorAll('#status button').forEach((b) => {
       b.setAttribute('aria-pressed', b.dataset.f === ui.filter);
@@ -516,6 +542,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
             ${f.orig ? `<div class="orig">${esc(f.orig)}</div>` : ''}
             <div class="rate">${f.ds != null ? `<span class="stars" aria-hidden="true"><i style="width:${Math.min(100, f.ds * 10)}%"></i></span>` : ''}<a class="ext" href="https://book.douban.com/subject/${esc(f.did)}/" target="_blank" rel="noopener">豆瓣 <b>${f.ds}</b>${f.votes ? ` <small>${fmtVotes(f.votes)}人</small>` : ''} ↗</a></div>
             <div class="meta">${esc([f.author, f.pub, f.year].filter(Boolean).join(' / '))}</div>
+            ${f.kind ? `<div class="tags"><button type="button" class="tag kind" data-kind="${f.kind}">${f.kind === 'F' ? '虚构' : '非虚构'}</button>${(f.tags || []).map((t) => `<button type="button" class="tag" data-genre="${esc(t)}">${esc(t)}</button>`).join('')}</div>` : ''}
             ${quote}
           </div>
         </div>
@@ -649,9 +676,17 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   });
   $('#src-filter').addEventListener('change', (e) => { ui.src = e.target.value; render(); });
   $('#q').addEventListener('input', (e) => { ui.q = e.target.value; render(); });
+  $('#kind-filter').addEventListener('change', (e) => { ui.kind = e.target.value; render(); });
+  $('#genre-filter').addEventListener('change', (e) => { ui.genre = e.target.value; render(); });
 
   $('#wall').addEventListener('error', (e) => { if (e.target.tagName === 'IMG') e.target.remove(); }, true);
   $('#wall').addEventListener('click', (e) => {
+    const tag = e.target.closest('.tag');
+    if (tag) { // tapping a tag filters by it; tapping the active one clears it
+      if (tag.dataset.kind) ui.kind = ui.kind === tag.dataset.kind ? '' : tag.dataset.kind;
+      else ui.genre = ui.genre === tag.dataset.genre ? '' : tag.dataset.genre;
+      render(); window.scrollTo(0, 0); return;
+    }
     const li = e.target.closest('.tile');
     if (!li) return;
     const f = byId.get(li.dataset.id);
