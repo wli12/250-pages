@@ -379,7 +379,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   function store() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
   function save() { store(); touch(); ghTouch(); }
 
-  const READERS = [['weread', '微信读书'], ['doubanread', '豆瓣阅读'], ['jd', '京东读书']]; // shown only where a page for the book itself is known
+  const READERS = [['weread', '微信读书'], ['doubanread', '豆瓣阅读'], ['dedao', '得到电子书'], ['dedaoAudio', '得到听书'], ['fanshu', '帆书讲书']]; // shown only where a page for the book itself is known
   const cur = () => listById.get(state.list);
   const isBook = () => { const l = cur(); return !!(l && l.kind === 'book'); };
   const GLYPH = { db: '豆', im: 'IMDb', boxoffice: '票', 'db-comedy': '喜', 'db-scifi': '科', 'db-mystery': '悬', 'db-romance': '爱', 'db-anim': '动', 'db-doc': '纪',
