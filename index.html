@@ -555,11 +555,11 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       }
       const img = /^posters\/[\w.-]+$/.test(f.img || '') ? f.img : '';
       const imdbUrl = f.tt ? `https://www.imdb.com/title/${esc(f.tt)}/` : `https://www.imdb.com/find/?q=${encodeURIComponent(f.orig || f.zh)}`;
-      const imdbScore = l.id === 'im' ? r.score : (f.imdb ? f.imdb.score : null);
+      const imdbScore = f.is != null ? f.is : (l.id === 'im' ? r.score : (f.imdb ? f.imdb.score : null));
       const star = l.id === 'im' ? r.score : (f.ds != null ? f.ds : imdbScore);
       const links = `${star != null ? `<span class="stars" aria-hidden="true"><i style="width:${Math.min(100, star * 10)}%"></i></span>` : ''}`
         + (f.did ? `<a class="ext" href="https://movie.douban.com/subject/${esc(f.did)}/" target="_blank" rel="noopener">豆瓣${f.ds != null ? ` <b>${f.ds}</b>` : ''}${f.votes ? ` <small>${fmtVotes(f.votes)}人</small>` : ''} ↗</a>` : '')
-        + `<a class="ext" href="${imdbUrl}" target="_blank" rel="noopener">IMDb${imdbScore != null ? ` <b>${imdbScore}</b>` : ''} ↗</a>`;
+        + `<a class="ext" href="${imdbUrl}" target="_blank" rel="noopener">IMDb${imdbScore != null ? ` <b>${imdbScore}</b>` : ''}${f.iv ? ` <small>${fmtVotes(f.iv)}人</small>` : ''} ↗</a>`;
       const meta = [f.year, f.region, f.genre, f.dir, f.cast].filter(Boolean).join(' / ');
       const others = (memberOf.get(f.id) || []).filter((x) => x.l !== l);
       const also = others.slice(0, 4).map((x) => `${esc(x.l.name)}${x.l.tone === 'award' ? '' : ` 第 ${x.rank} 名`}`).join('、') + (others.length > 4 ? ` 等 ${others.length} 个榜单` : '');
@@ -599,7 +599,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     const ranks = [];
     if (f.did) ranks.push(`<a href="https://movie.douban.com/subject/${esc(f.did)}/" target="_blank" rel="noopener">豆瓣${f.ds != null ? ` · ${f.ds}` : ''} ↗</a>`);
     const imdbUrl = f.tt ? `https://www.imdb.com/title/${esc(f.tt)}/` : `https://www.imdb.com/find/?q=${encodeURIComponent(f.orig || f.zh)}`;
-    ranks.push(`<a href="${imdbUrl}" target="_blank" rel="noopener">IMDb${f.imdb ? ` · ${f.imdb.score}` : ''} ↗</a>`);
+    ranks.push(`<a href="${imdbUrl}" target="_blank" rel="noopener">IMDb${f.is != null ? ` · ${f.is}` : ''} ↗</a>`);
     const inLists = (memberOf.get(f.id) || []).map((x) => `${esc(x.l.name)}${x.l.tone === 'award' ? '' : ` #${x.rank}`}`).join(' · ');
     const sub = [f.orig, f.year, f.region, f.genre, f.dir, f.cast].filter(Boolean).join(' / ');
     const srcs = sources().map((s) => {
