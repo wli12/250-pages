@@ -49,6 +49,7 @@ body[data-tone="genre"], body[data-tone="award"], body[data-tone="box"], body[da
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--text); }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -113,6 +114,8 @@ a { color: inherit; }
 .tabs button[aria-pressed="true"] { background: var(--tint); color: var(--deep); font-weight: 700; }
 .finder { display: flex; gap: 8px; }
 .finder { flex-wrap: wrap; }
+.only-src { display: inline-flex; align-items: center; gap: 6px; background: var(--soft); border-radius: 10px; padding: 8px 10px; white-space: nowrap; cursor: pointer; }
+.only-src input { width: 16px; height: 16px; accent-color: var(--acc); }
 .finder select, .finder input { border: 0; background: var(--soft); border-radius: 10px; padding: 8px 10px; min-width: 0; }
 .finder input { flex: 1; }
 
@@ -281,7 +284,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       <button type="button" data-f="hide" aria-pressed="false" hidden>隐藏</button>
     </div>
     <div class="finder">
-      <select id="src-filter" aria-label="按播放源筛选"></select>
+      <label class="only-src" id="has-src-wrap"><input type="checkbox" id="has-src"> 只看有播放源的</label>
       <select id="kind-filter" aria-label="虚构或非虚构" hidden></select>
       <select id="genre-filter" aria-label="按题材筛选" hidden></select>
       <input id="q" type="search" placeholder="搜片名、导演、演员、类型" aria-label="搜索">
@@ -314,7 +317,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       <h3>自动保存到 GITHUB</h3>
       <p class="hint">填入访问令牌后，标记会自动保存到你的私有仓库，换浏览器或清了缓存也能找回。令牌只存在这个浏览器里。</p>
       <div class="email-form"><input type="password" id="gh-token" placeholder="github_pat_…" autocomplete="off" aria-label="GitHub 访问令牌"><button type="button" class="btn" id="gh-connect">连接</button></div>
-      <div class="row"><span class="hint" id="gh-msg" role="status"></span><button type="button" class="btn" id="gh-off" hidden>断开</button></div>
+      <div class="row"><span class="hint" id="gh-msg" role="status"></span><button type="button" class="btn" id="gh-show" hidden>显示令牌</button><button type="button" class="btn" id="gh-off" hidden>断开</button></div>
     </div>
     <h3>备份</h3>
     <p class="hint">没有登录时，标记只存在这台设备的这个浏览器里。换设备或清理浏览器数据前，把下面的备份文字存好；在新设备上粘贴后点“导入”。</p>
@@ -355,7 +358,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
 
   // marks: { filmId: 'seen' | 'want' }; avail: { filmId: { sourceId: { a: 1 | 0, u: url } } }
   let state = { marks: {}, avail: {}, sources: DEFAULT_SOURCES.map((s) => ({ ...s })), srcVer: SRC_VER, list: '', section: 'movie' };
-  let ui = { filter: 'todo', src: '', q: '', kind: '', genre: '' }; // a list opens on what is still unseen
+  let ui = { filter: 'todo', hasSrc: false, q: '', kind: '', genre: '' }; // a list opens on what is still unseen
   let lists = [], listById = new Map(), memberOf = new Map(), loaded = false;
   let films = [], meta = {}, byId = new Map(), openId = null;
 
@@ -434,7 +437,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   const searchUrl = (s, f) => safeUrl((s.tpl || '').replace('{q}', encodeURIComponent(f.zh)));
 
   function visible() {
-    const l = cur(), q = ui.q.trim().toLowerCase();
+    const l = cur(), q = ui.q.trim().toLowerCase(), book = !!(l && l.kind === 'book');
     if (!l) return [];
     return l.items.map((r) => ({ r, f: byId.get(r.f) })).filter(({ f }) => {
       if (!f) return false;
@@ -443,7 +446,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       if (ui.filter === 'want' && m !== 'want') return false;
       if (ui.filter === 'todo' && m === 'seen') return false;
       if ((ui.filter === 'hide') !== (m === 'hide')) return false;
-      if (ui.src && !(srcById(ui.src) && srcInfo(f, srcById(ui.src)).has)) return false;
+      if (ui.hasSrc && !book && !sources().some((s) => srcInfo(f, s).has)) return false;
       if (ui.kind && f.kind !== ui.kind) return false;
       if (ui.genre && !(f.tags || []).includes(ui.genre)) return false;
       if (q && !`${f.zh} ${f.orig || ''} ${f.dir || ''} ${f.cast || ''} ${f.genre || ''} ${f.author || ''} ${(f.tags || []).join(' ')} ${f.year}`.toLowerCase().includes(q)) return false;
@@ -495,12 +498,8 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     $('#back').textContent = book ? '‹ 全部书单' : '‹ 全部榜单';
     $('#q').placeholder = book ? '搜书名、作者' : '搜片名、导演、演员、类型';
 
-    const sel = $('#src-filter');
-    sel.hidden = book;
-    sel.innerHTML = '<option value="">播放源不限</option>' +
-      sources().map((s) => `<option value="${esc(s.id)}">${esc(s.name)}有</option>`).join('');
-    if (book || !sources().some((s) => s.id === ui.src)) ui.src = '';
-    sel.value = ui.src;
+    $('#has-src-wrap').hidden = book;
+    $('#has-src').checked = !!ui.hasSrc;
     // book lists: fiction / non-fiction and subject, each option counting what the other choice leaves
     const KIND = { F: '虚构', N: '非虚构' };
     const ks = $('#kind-filter'), gs = $('#genre-filter');
@@ -574,7 +573,9 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       const links = `${star != null ? `<span class="stars" aria-hidden="true"><i style="width:${Math.min(100, star * 10)}%"></i></span>` : ''}`
         + (f.did ? `<a class="ext" href="https://movie.douban.com/subject/${esc(f.did)}/" target="_blank" rel="noopener">豆瓣${f.ds != null ? ` <b>${f.ds}</b>` : ''}${f.votes ? ` <small>${fmtVotes(f.votes)}人</small>` : ''} ↗</a>` : '')
         + `<a class="ext" href="${imdbUrl}" target="_blank" rel="noopener">IMDb${imdbScore != null ? ` <b>${imdbScore}</b>` : ''}${f.iv ? ` <small>${fmtVotes(f.iv)}人</small>` : ''} ↗</a>`;
-      const meta = [f.year, f.region, f.genre, f.dir, f.cast].filter(Boolean).join(' / ');
+      const meta = [f.year, f.min ? `${f.min} 分钟` : '', f.region, f.genre, f.dir, f.cast].filter(Boolean).join(' / ');
+      // short films are hard to find: offer a web search for the film itself
+      const gq = f.short ? [...new Set([f.zh, f.en || f.orig].filter(Boolean))].map((t) => `"${t}"`).join(' OR ') + ` ${f.year || ''} 短片 short film` : '';
       const others = (memberOf.get(f.id) || []).filter((x) => x.l !== l);
       const also = others.slice(0, 4).map((x) => `${esc(x.l.name)}${x.l.tone === 'award' ? '' : ` 第 ${x.rank} 名`}`).join('、') + (others.length > 4 ? ` 等 ${others.length} 个榜单` : '');
       const chips = sources().map((s) => {
@@ -597,7 +598,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
           </div>
         </div>
         <div class="card-foot">
-          <span class="chips">${chips}<button type="button" class="chip edit" data-open>记录播放网址</button></span>${acts}
+          <span class="chips">${chips}${gq ? `<a class="chip" href="https://www.google.com/search?q=${encodeURIComponent(gq)}" target="_blank" rel="noopener">Google 搜片源 ↗</a>` : ''}<button type="button" class="chip edit" data-open>记录播放网址</button></span>${acts}
         </div>
       </li>`;
     }).join('');
@@ -688,7 +689,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     const b = e.target.closest('button[data-f]');
     if (b) { ui.filter = b.dataset.f; render(); }
   });
-  $('#src-filter').addEventListener('change', (e) => { ui.src = e.target.value; render(); });
+  $('#has-src').addEventListener('change', (e) => { ui.hasSrc = e.target.checked; render(); });
   $('#q').addEventListener('input', (e) => { ui.q = e.target.value; render(); });
   $('#kind-filter').addEventListener('change', (e) => { ui.kind = e.target.value; render(); });
   $('#genre-filter').addEventListener('change', (e) => { ui.genre = e.target.value; render(); });
@@ -998,7 +999,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   let gh = { token: '', synced: false, dirty: false }, ghSha = null, ghTimer = 0, ghBusy = false, ghAgain = false;
   try { Object.assign(gh, JSON.parse(localStorage.getItem(GH_KEY)) || {}); } catch (e) {}
   const ghSave = () => { try { localStorage.setItem(GH_KEY, JSON.stringify(gh)); } catch (e) {} };
-  const ghSay = (t) => { $('#gh-msg').textContent = t; $('#gh-off').hidden = !gh.token; };
+  const ghSay = (t) => { $('#gh-msg').textContent = t; $('#gh-off').hidden = $('#gh-show').hidden = !gh.token; };
   const b64 = (t) => { let o = ''; for (const c of new TextEncoder().encode(t)) o += String.fromCharCode(c); return btoa(o); };
   const unb64 = (t) => new TextDecoder().decode(Uint8Array.from(atob(t.replace(/\s/g, '')), (c) => c.charCodeAt(0)));
   async function ghApi(method, body) {
@@ -1055,8 +1056,10 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     $('#gh-connect').addEventListener('click', () => {
       const t = $('#gh-token').value.trim();
       if (!t) { ghSay('先把令牌粘贴到左边的框里。'); return; }
-      gh = { token: t, synced: false, dirty: false }; ghSave(); $('#gh-token').value = ''; ghSay('正在连接…'); ghPull();
+      gh = { token: t, synced: false, dirty: false }; ghSave(); $('#gh-token').value = ''; $('#gh-token').type = 'password'; ghSay('正在连接…'); ghPull();
     });
+    // GitHub never shows a token again after creating it; this browser still has it, so let it be copied out
+    $('#gh-show').addEventListener('click', () => { const i = $('#gh-token'); i.type = 'text'; i.value = gh.token; i.select(); ghSay('这是保存在这个浏览器里的令牌，可以复制到别处使用。'); });
     $('#gh-off').addEventListener('click', () => { gh = { token: '', synced: false, dirty: false }; ghSave(); ghSha = null; ghSay('已断开。这个浏览器里的标记还在。'); });
     document.addEventListener('visibilitychange', () => { if (!document.hidden && gh.token && !gh.dirty) ghPull(); });
     window.addEventListener('online', () => { if (gh.token) ghPull(); });
