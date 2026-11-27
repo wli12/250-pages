@@ -337,10 +337,15 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     { id: 'mgtv', name: '芒果TV', tag: '芒', tpl: 'https://so.mgtv.com/so?k={q}' },
     { id: 'migu', name: '咪咕视频', tag: '咪', tpl: '' },
     { id: 'm1905', name: '1905电影网', tag: '19', tpl: 'https://www.1905.com/search/?q={q}' },
+    { id: 'netflix', name: 'Netflix', tag: 'N', tpl: '' },
+    { id: 'disney', name: 'Disney+', tag: 'D', tpl: '' },
+    { id: 'appletv', name: 'Apple TV', tag: 'A', tpl: '' },
+    { id: 'youtube', name: 'YouTube', tag: 'Y', tpl: '' },
+    { id: 'archive', name: '互联网档案馆', tag: '档', tpl: '' },
     { id: 'ole', name: '欧乐影院', tag: '欧', tpl: 'https://www.olevod.com/search?q={q}', pin: true },
     { id: 'iyf', name: '爱壹帆', tag: '帆', tpl: '' },
   ];
-  const SRC_VER = 6;
+  const SRC_VER = 7;
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const safeUrl = (u) => (/^https?:\/\//i.test((u || '').trim()) ? u.trim() : '');
