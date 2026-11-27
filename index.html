@@ -383,7 +383,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   const cur = () => listById.get(state.list);
   const isBook = () => { const l = cur(); return !!(l && l.kind === 'book'); };
   const GLYPH = { db: '豆', im: 'IMDb', boxoffice: '票', 'db-comedy': '喜', 'db-scifi': '科', 'db-mystery': '悬', 'db-romance': '爱', 'db-anim': '动', 'db-doc': '纪',
-    'oscar-picture': '影', 'oscar-intl': '外', 'oscar-anim': '动', 'oscar-screenplay': '剧', 'oscar-vfx': '效', palme: '棕', 'oscar-short-anim': '动', 'oscar-short-live': '短', 'oscar-short-doc': '纪', 'book-db': '书' };
+    'oscar-picture': '影', 'oscar-intl': '外', 'oscar-anim': '动', 'oscar-screenplay': '剧', 'oscar-vfx': '效', palme: '棕', 'oscar-doc': '纪', 'oscar-adapted': '改', 'oscar-short-anim': '动', 'oscar-short-live': '短', 'oscar-short-doc': '纪', 'book-db': '书' };
   function go(id) {
     state.list = id; ui.filter = 'all'; ui.q = ''; $('#q').value = '';
     store();
