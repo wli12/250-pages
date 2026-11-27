@@ -268,10 +268,10 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
 <section class="controls">
   <div class="inner">
     <div class="tabs" role="group" aria-label="标记状态" id="status">
-      <button type="button" data-f="all" aria-pressed="true">全部</button>
+      <button type="button" data-f="todo" aria-pressed="true">未看</button>
+      <button type="button" data-f="all" aria-pressed="false">全部</button>
       <button type="button" data-f="seen" aria-pressed="false">已看</button>
       <button type="button" data-f="want" aria-pressed="false">想看</button>
-      <button type="button" data-f="todo" aria-pressed="false">未看</button>
     </div>
     <div class="finder">
       <select id="src-filter" aria-label="按播放源筛选"></select>
@@ -341,7 +341,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
 
   // marks: { filmId: 'seen' | 'want' }; avail: { filmId: { sourceId: { a: 1 | 0, u: url } } }
   let state = { marks: {}, avail: {}, sources: DEFAULT_SOURCES.map((s) => ({ ...s })), srcVer: SRC_VER, list: '', section: 'movie' };
-  let ui = { filter: 'all', src: '', q: '' };
+  let ui = { filter: 'todo', src: '', q: '' }; // a list opens on what is still unseen
   let lists = [], listById = new Map(), memberOf = new Map(), loaded = false;
   let films = [], meta = {}, byId = new Map(), openId = null;
 
@@ -385,7 +385,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   const GLYPH = { db: '豆', im: 'IMDb', boxoffice: '票', 'db-comedy': '喜', 'db-scifi': '科', 'db-mystery': '悬', 'db-romance': '爱', 'db-anim': '动', 'db-doc': '纪',
     'oscar-picture': '影', 'oscar-intl': '外', 'oscar-anim': '动', 'oscar-screenplay': '剧', 'oscar-vfx': '效', palme: '棕', 'oscar-doc': '纪', 'oscar-adapted': '改', 'oscar-short-anim': '动', 'oscar-short-live': '短', 'oscar-short-doc': '纪', 'book-db': '书' };
   function go(id) {
-    state.list = id; ui.filter = 'all'; ui.q = ''; $('#q').value = '';
+    state.list = id; ui.filter = 'todo'; ui.q = ''; $('#q').value = '';
     store();
     const h = id ? 'l-' + id : '';
     render();
