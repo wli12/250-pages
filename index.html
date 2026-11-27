@@ -166,6 +166,8 @@ main.inner { padding-block: 14px 56px; display: flex; flex-direction: column; ga
 .mk { border: 1.5px solid var(--line); background: none; border-radius: 10px; padding: 6px 14px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .mk[data-mark="seen"][aria-pressed="true"] { background: var(--acc); border-color: var(--acc); color: var(--on-acc); }
 .mk[data-mark="want"][aria-pressed="true"] { background: var(--want); border-color: var(--want); color: var(--on-want); }
+.mk[data-mark="hide"][aria-pressed="true"] { background: var(--muted); border-color: var(--muted); color: var(--surface); }
+.tabs button { font-size: 14px; }
 .empty { color: var(--muted); padding: 32px 0; text-align: center; margin: 0; }
 .foot { color: var(--muted); font-size: 12px; margin: 0; }
 
@@ -276,6 +278,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       <button type="button" data-f="all" aria-pressed="false">全部</button>
       <button type="button" data-f="seen" aria-pressed="false">已看</button>
       <button type="button" data-f="want" aria-pressed="false">想看</button>
+      <button type="button" data-f="hide" aria-pressed="false" hidden>隐藏</button>
     </div>
     <div class="finder">
       <select id="src-filter" aria-label="按播放源筛选"></select>
@@ -439,6 +442,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       if (ui.filter === 'seen' && m !== 'seen') return false;
       if (ui.filter === 'want' && m !== 'want') return false;
       if (ui.filter === 'todo' && m === 'seen') return false;
+      if ((ui.filter === 'hide') !== (m === 'hide')) return false;
       if (ui.src && !(srcById(ui.src) && srcInfo(f, srcById(ui.src)).has)) return false;
       if (ui.kind && f.kind !== ui.kind) return false;
       if (ui.genre && !(f.tags || []).includes(ui.genre)) return false;
@@ -448,9 +452,10 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   }
 
   function progress(l) {
-    let seen = 0, want = 0;
-    for (const r of l.items) { const m = state.marks[r.f]; if (m === 'seen') seen++; else if (m === 'want') want++; }
-    return { seen, want, total: l.items.length };
+    // a hidden item is set aside: it counts towards nothing but the hidden tab
+    let seen = 0, want = 0, hide = 0;
+    for (const r of l.items) { const m = state.marks[r.f]; if (m === 'seen') seen++; else if (m === 'want') want++; else if (m === 'hide') hide++; }
+    return { seen, want, hide, total: l.items.length - hide };
   }
   function renderHome() {
     document.body.dataset.tone = '';
@@ -459,10 +464,10 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     const book = state.section === 'book';
     const mine = lists.filter((l) => (l.kind === 'book') === book);
     const ids = new Set(mine.flatMap((l) => l.items.map((r) => r.f)));
-    let seen = 0, want = 0;
-    for (const id of ids) { const m = state.marks[id]; if (m === 'seen') seen++; else if (m === 'want') want++; }
+    let seen = 0, want = 0, hide = 0;
+    for (const id of ids) { const m = state.marks[id]; if (m === 'seen') seen++; else if (m === 'want') want++; else if (m === 'hide') hide++; }
     $('#home-sum').textContent = book
-      ? `${mine.length} 个书单 · 共 ${ids.size} 本 · 已读 ${seen} 本 · 想读 ${want} 本`
+      ? `${mine.length} 个书单 · 共 ${ids.size - hide} 本 · 已读 ${seen} 本 · 想读 ${want} 本${hide ? ` · 已隐藏 ${hide} 本` : ''}`
       : `${mine.length} 个榜单 · 共 ${ids.size} 部电影 · 已看 ${seen} 部 · 想看 ${want} 部。在一个榜单里标记，其他榜单同步更新。`;
     const groups = [];
     for (const l of mine) { let g = groups.find((x) => x.name === l.group); if (!g) groups.push(g = { name: l.group, lists: [] }); g.lists.push(l); }
@@ -520,8 +525,11 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
     $('#n-all').textContent = p.total;
     $('#pct').textContent = Math.round((p.seen / p.total) * 100) + '%';
     $('#bar').style.width = (p.seen / p.total) * 100 + '%';
-    const counts = { all: ps.total, seen: ps.seen, want: ps.want, todo: ps.total - ps.seen };
-    const labels = { all: '全部', ...W };
+    const counts = { all: ps.total, seen: ps.seen, want: ps.want, todo: ps.total - ps.seen, hide: ps.hide };
+    const labels = { all: '全部', ...W, hide: '隐藏' };
+    if (!book && ui.filter === 'hide') ui.filter = 'todo';
+    $('#status [data-f="hide"]').hidden = !book;
+    $('#status').style.gridTemplateColumns = `repeat(${book ? 5 : 4}, 1fr)`;
     document.querySelectorAll('#status button').forEach((b) => {
       b.setAttribute('aria-pressed', b.dataset.f === ui.filter);
       b.textContent = `${labels[b.dataset.f]}(${counts[b.dataset.f]})`;
@@ -537,6 +545,7 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
       const acts = `<span class="acts">
             <button type="button" class="mk" data-mark="want" aria-pressed="${m === 'want'}">${W.want}</button>
             <button type="button" class="mk" data-mark="seen" aria-pressed="${m === 'seen'}">${W.seen}</button>
+            ${book ? `<button type="button" class="mk" data-mark="hide" aria-pressed="${m === 'hide'}" title="不感兴趣的书可以隐藏，在未读和已读里都不再出现">隐藏</button>` : ''}
           </span>`;
       if (book) {
         return `<li class="tile${m === 'seen' ? ' is-seen' : ''}" data-id="${esc(f.id)}">
