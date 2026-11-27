@@ -788,10 +788,12 @@ textarea { min-height: 84px; font-family: ui-monospace, Menlo, Consolas, monospa
   // A film that joins the Douban list later gets a new id; carry old marks over.
   function migrate() {
     for (const f of films) {
-      if (!f.alt) continue;
-      for (const bag of [state.marks, state.avail]) {
-        if (bag[f.alt] != null && bag[f.id] == null) bag[f.id] = bag[f.alt];
-        delete bag[f.alt];
+      for (const old of [f.alt, ...(f.alts || [])]) {
+        if (!old || old === f.id) continue;
+        for (const bag of [state.marks, state.avail]) {
+          if (bag[old] != null && (bag[f.id] == null || bag[old] === 'seen')) bag[f.id] = bag[old];
+          delete bag[old];
+        }
       }
     }
   }
